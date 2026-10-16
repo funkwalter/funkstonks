@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Willkommen bei funkSTONKS</h1>
+<p class="mute">Ein paar Fragen, dann kann es losgehen. Alles hier lässt sich später
+jederzeit unter <b>Einstellungen</b> ändern – nichts davon ist endgültig.</p>
+
+<div class="card">
+<h2 class="mt-0">Was funkSTONKS macht</h2>
+<p>Du lädst die CSV-Exporte deiner Konten hoch. funkSTONKS sortiert jede Zahlung in eine
+Kategorie, merkt sich deine Entscheidungen als Regeln und zeigt dir dann, wohin dein Geld
+fließt – pro Monat, pro Jahr, pro Empfänger.</p>
+<p class="mute mb-0">Alles läuft <b>lokal auf deinem Rechner</b>. Es gibt
+keinen Server, keinen Login, keine Cloud. Deine Kontodaten verlassen diesen Computer nicht.</p>
+</div>
+
+<form method="post">
+<div class="card">
+<h2 class="mt-0">1 · Welche Konten nutzt du?</h2>
+<p class="mute mt-0">Hak nur an, was du wirklich hast. Was hier fehlt,
+taucht später nirgends auf – kein Menüpunkt, keine Nachfrage, keine leeren Seiten.</p>
+<table>
+{% for key, label, hint in sources %}
+<tr>
+<td class="va-top w-26">
+<input type="checkbox" name="src_{{key}}" value="1"
+  {{'checked' if key in enabled}} {{'disabled' if key=='bank'}}>
+{% if key == 'bank' %}<input type="hidden" name="src_bank" value="1">{% endif %}</td>
+<td><b>{{label}}</b>{% if key=='bank' %} <span class="pill">immer nötig</span>{% endif %}
+<br><span class="mute">{{hint}}</span></td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+<div class="card">
+<h2 class="mt-0">2 · Ab wann soll ausgewertet werden?</h2>
+<input type="date" name="data_cutoff" value="{{st.data_cutoff}}">
+<p class="mute">Optional. Buchungen vor diesem Tag werden ignoriert. Nützlich, wenn dein
+Export weiter zurückreicht, als dich interessiert. Leer lassen heißt: alles zählt.</p>
+</div>
+
+<div class="card">
+<h2 class="mt-0">3 · Woran erkennt man dein Einkommen?</h2>
+<input type="text" name="income_pattern" placeholder="z.B. Name deines Arbeitgebers" class="minw-300">
+<select name="income_category">
+{% for n in inc_cats %}<option value="{{n}}"
+  {{'selected' if n==st.income_category}}>{{n}}</option>{% endfor %}
+</select>
+<p class="mute">Optional. So, wie dein Gehaltseingang am Kontoauszug heißt – meist der
+Arbeitgeber. Mehrere Quellen komma-getrennt. Daraus wird eine ganz normale Regel, die du
+später unter „Regeln“ wiederfindest und ändern kannst.</p>
+</div>
+
+<div class="card">
+<h2 class="mt-0">4 · Teilst du Kosten mit jemandem?</h2>
+<input type="text" name="shared_name" value="{{st.shared_name}}"
+  placeholder="Name, z.B. Anna – leer lassen wenn nicht" class="minw-260">
+<p class="mute">Wenn du z.B. die Miete komplett überweist und die Hälfte zurückbekommst,
+soll nur deine Hälfte als Ausgabe zählen. Welche Buchungen das betrifft, legst du danach
+unter Einstellungen fest – dieser Name taucht dann in der Notiz auf („Annas Anteil“).</p>
+
+<div id="sw-block" class="mt-10">
+<label><b>Dein Name im Splitwise-Export</b></label><br>
+<input type="text" name="splitwise_name" value="{{st.splitwise_name}}"
+  placeholder="genau wie in der Spaltenüberschrift" class="minw-280">
+<p class="mute">Nur nötig, wenn du Splitwise oben angehakt hast.
+Der Export hat pro Person eine Spalte – daran erkennt die App, welcher Anteil deiner ist.
+Steht dort z.B. „Anna Muster“, trag genau das ein.</p>
+<label><b>Gruppe der geteilten Fixkosten</b></label><br>
+<input type="text" name="fixed_cost_group" value="{{st.fixed_cost_group}}"
+  placeholder="z.B. wohnung – leer lassen wenn keine" class="minw-280">
+<p class="mute mb-0">Die Splitwise-Gruppe, in der Miete und Nebenkosten
+abgerechnet werden – damit die App die Fixkosten dort nicht ein zweites Mal zählt.</p>
+</div>
+</div>
+
+<div class="card">
+<h2 class="mt-0">5 · Darstellung</h2>
+<select name="theme">
+{% for key, name in themes %}<option value="{{key}}" {{'selected' if st.theme==key}}>{{name}}</option>{% endfor %}
+</select>
+<p class="mute mb-0">Lässt sich auch jederzeit unten in der Seitenleiste (◐)
+umschalten.</p>
+</div>
+
+<button class="fs-15 p-8-20">Fertig – los geht's</button>
+<a href="/hilfe" class="btn ghost ml-8">Erst die Hilfe lesen</a>
+</form>
+
+<script src="{{ url_for('static', filename='js/setup.js') }}"></script>
+{% endblock %}

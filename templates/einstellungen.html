@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% import "_cat_options.html" as catopt %}
+{% block content %}
+<h1>Einstellungen</h1>
+
+<div class="card">
+<h2 class="mt-0">Datenquellen</h2>
+<form method="post">
+<input type="hidden" name="action" value="sources">
+<table>
+{% for key, label, hint in sources %}
+<tr>
+<td class="va-top w-26">
+<input type="checkbox" name="src_{{key}}" value="1"
+  {{'checked' if key in enabled}} {{'disabled' if key=='bank'}}>
+{% if key == 'bank' %}<input type="hidden" name="src_bank" value="1">{% endif %}</td>
+<td><b>{{label}}</b>
+{% if counts.get(key) %}<span class="pill">{{counts[key]}} Buchungen</span>{% endif %}
+<br><span class="mute">{{hint}}</span></td>
+</tr>
+{% endfor %}
+</table>
+<button class="mt-8">Datenquellen speichern</button>
+</form>
+{% if colmaps %}
+<h3 class="m-14-0-4">Gemerkte Spaltenzuordnungen</h3>
+<table>{% for cm in colmaps %}<tr class="colmap-row" data-sig="{{cm.sig}}">
+<td title="{{cm.header}}">{{cm.name or 'Bank-CSV'}} <span class="mute">({{cm.fields}})</span></td>
+<td class="num"><form method="post" class="inline" data-confirm="Zuordnung „{{cm.name}}“ löschen? Die nächste Datei dieser Bank fragt wieder nach.">
+<input type="hidden" name="action" value="colmap_delete"><input type="hidden" name="sig" value="{{cm.sig}}">
+<button class="ghost fs-11 p-2-7">löschen</button></form></td>
+</tr>{% endfor %}</table>
+{% endif %}
+</div>
+
+<div class="card">
+<h2 class="mt-0">Auswertung</h2>
+<form method="post">
+<input type="hidden" name="action" value="general">
+
+<p><label title="Beim Start einmal am Tag die Kurse der Depotpositionen holen (Yahoo Finance) – sonst nur über den Knopf unter Investitionen"><input type="hidden" name="auto_prices_present" value="1"><input type="checkbox" name="auto_prices" value="1" {{'checked' if st.auto_prices == '1'}}> <b>Depotkurse beim Start holen</b> (einmal täglich)</label></p>
+<p><label><b>Auswertung ab</b></label><br>
+<input type="date" name="data_cutoff" value="{{st.data_cutoff}}">
+<span class="mute">Buchungen vor diesem Tag werden beim Import entfernt und tauchen
+nirgends auf. Leer lassen = alles zählt, ab der ersten Buchung. Sinnvoll, wenn dein
+Export weiter zurückreicht, als du auswerten willst.</span></p>
+
+<p><label><b>Dein Einkommen</b></label><br>
+<input type="text" name="income_pattern" value="{{income_pattern}}"
+  placeholder="z.B. Name deines Arbeitgebers" class="minw-300">
+<select name="income_category">
+{% for n in inc_cats %}<option value="{{n}}"
+  {{'selected' if n==st.income_category}}>{{n}}</option>{% endfor %}
+</select>
+<span class="mute">So heißt dein Gehalt auf dem Kontoauszug – meist der Arbeitgeber,
+mehrere Einkommensquellen komma-getrennt. Solche Eingänge werden automatisch der
+gewählten Kategorie zugeordnet, und die Jahresübersicht rechnet daraus „Ø pro Monat“.
+Das sind ganz normale Regeln: du findest sie auch unter <a href="/rules">Regeln</a>
+wieder und kannst sie dort genauso ändern.</span></p>
+
+<p><label><b>Fixkosten-Kategorien</b></label><br>
+<span class="mute">Im Dashboard-Diagramm laufen diese Kategorien über den Ast „Fixkosten“,
+alle anderen über „Nebenkosten“. Rein optisch – es ändert keine Beträge.</span><br>
+{% for c in cats if c.kind=='expense' %}
+<label class="mute inline-block mr-12">
+<input type="checkbox" name="fixkosten_cats" value="{{c.name}}"
+  {{'checked' if c.name in fixkosten_cats}}> {{c.name}}</label>
+{% endfor %}</p>
+
+<p><label><b>„Laufende Kosten“ zeigt nur diese Kategorien</b></label><br>
+<span class="mute">Die automatische Erkennung findet alles, was regelmäßig abgebucht wird –
+auch den wöchentlichen Mittagssnack. Mit dieser Auswahl legst du fest, was dort wirklich
+angezeigt wird.</span><br>
+{% for c in cats if c.kind=='expense' %}
+<label class="mute inline-block mr-12">
+<input type="checkbox" name="fixkosten_privat_cats" value="{{c.name}}"
+  {{'checked' if c.name in privat_cats}}> {{c.name}}</label>
+{% endfor %}</p>
+
+<p><label><b>Name der Person, mit der du teilst</b></label><br>
+<input type="text" name="shared_name" value="{{st.shared_name}}" placeholder="z.B. Anna" class="minw-220">
+<span class="mute">Nur für die Notiz an geteilten Buchungen („Annas Anteil“). Leer lassen,
+wenn du nichts teilst.</span></p>
+
+<div data-source-block="splitwise" {% if 'splitwise' not in enabled %}hidden{% endif %}>
+<p><label><b>Dein Name im Splitwise-Export</b></label><br>
+<input type="text" name="splitwise_name" value="{{st.splitwise_name}}"
+  placeholder="genau wie in der Spaltenüberschrift" class="minw-260">
+<span class="mute">Der Splitwise-CSV-Export hat pro Person eine Spalte. Trag hier deinen
+Namen so ein, wie er dort als Überschrift steht – daran erkennt die App, welche Spalte
+deinen Anteil enthält.</span></p>
+
+<p><label><b>Gruppe der geteilten Fixkosten</b></label><br>
+<input type="text" name="fixed_cost_group" value="{{st.fixed_cost_group}}"
+  placeholder="z.B. wohnung" class="minw-220">
+<span class="mute">Die Splitwise-Gruppe, in der Miete, Strom usw. abgerechnet werden. Positionen
+dieser Gruppe, die zu einem Fixkosten-Stichwort passen, zählen nicht doppelt – sie stecken
+schon in der gekürzten Kontobuchung. Leer lassen, wenn du keine Fixkosten teilst.</span></p>
+
+<p><label><b>Gruppen ohne „Als Urlaub markieren“</b></label><br>
+<input type="text" name="urlaub_excluded" value="{{urlaub_excluded}}"
+  placeholder="z.B. wohnung, wg" class="minw-300">
+<span class="mute">Komma-getrennt. Bei diesen Gruppen wird der Schalter ausgeblendet –
+sinnvoll für Dauergruppen wie die WG, wo pauschal „alles Urlaub“ nie stimmt.</span></p>
+</div>
+
+<button>Speichern</button>
+</form>
+</div>
+
+<div class="card">
+<h2 class="mt-0">Geteilte und automatische Fixkosten</h2>
+<table>
+<tr><th>Muster im Text</th><th>Kategorie</th><th class="num">dein Anteil</th>
+<th>Splitwise-Stichwort</th><th></th></tr>
+{% for f in fixed %}
+<tr>
+<td colspan="5" class="p-0">
+<form method="post" class="inline flex wrap gap-6 items-center w-full p-4-0">
+<input type="hidden" name="action" value="fixed_save">
+<input type="hidden" name="fixed_id" value="{{f.id}}">
+<input type="text" name="pattern" value="{{f.pattern}}" class="flex-2 minw-140">
+<select name="category_id" class="flex-2">
+<option value="">— keine —</option>
+{{ catopt.options(cat_groups, f.category_id, cat_by_id) }}
+</select>
+<input type="number" name="share_percent" value="{{f.share_percent}}" min="1" max="100"
+  title="100 = zählt voll, 50 = du zahlst die Hälfte" class="w-70"> %
+<input type="text" name="sw_keyword" value="{{f.sw_keyword}}"
+  placeholder="optional" class="flex-2 minw-120">
+<button class="ghost">speichern</button>
+</form>
+</td>
+</tr>
+<tr><td colspan="5" class="p-0-0-8">
+<form method="post" class="inline" data-confirm="Eintrag „{{f.pattern}}“ löschen?">
+<input type="hidden" name="action" value="fixed_delete">
+<input type="hidden" name="fixed_id" value="{{f.id}}">
+<button class="ghost fs-11">löschen</button>
+</form>
+</td></tr>
+{% endfor %}
+{% if not fixed %}<tr><td colspan="5" class="mute">Noch keine Fixkosten hinterlegt.</td></tr>{% endif %}
+</table>
+
+<form method="post" class="filters mt-10">
+<input type="hidden" name="action" value="fixed_add">
+<input type="text" name="pattern" placeholder="Muster, z.B. Hausverwaltung" required title="Teil von Empfänger oder Verwendungszweck, Groß/Klein egal" class="minw-180">
+<select name="category_id"><option value="">— keine Kategorie —</option>
+{{ catopt.options(cat_groups, none, cat_by_id) }}</select>
+<input type="number" name="share_percent" value="100" min="1" max="100" title="Dein Anteil in Prozent: 100 = zählt voll, nur die Kategorie wird gesetzt"
+  title="100 = zählt voll, 50 = du zahlst die Hälfte" class="w-70"> %
+<input type="text" name="sw_keyword" placeholder="Splitwise-Stichwort (optional)" title="Ein Wort aus der Splitwise-Beschreibung desselben Postens, z.B. miete – für den Betragsabgleich" class="minw-170">
+<button>Hinzufügen</button>
+</form>
+</div>
+
+{% if is_dev_checkout %}
+<div class="card">
+<h2 class="mt-0">Weitergabe</h2>
+<form method="post">
+<input type="hidden" name="action" value="share">
+<input type="text" name="public_repo_url" value="{{ st.public_repo_url }}"
+ placeholder="https://github.com/konto/funkstonks.git" title="Öffentliches Repo – bei jedem Push ins private Repo wird der geprüfte Stand dorthin veröffentlicht" class="w-full mb-6">
+<input type="text" name="share_forbidden" value="{{ st.share_forbidden_text }}"
+ placeholder="z.B. Anna, Muster, Hausverwaltung Muster, users/anna" title="Begriffe, die nie im öffentlichen Repo landen dürfen – eine Datei mit Treffer stoppt die Veröffentlichung" class="w-full">
+<div class="mt-6"><button>Speichern</button></div>
+</form>
+</div>
+{% endif %}
+
+<div class="card">
+<h2 class="mt-0">Darstellung</h2>
+<form method="post" class="filters">
+<input type="hidden" name="action" value="theme">
+<label class="mute">Farbschema</label>
+<select name="theme" class="autosubmit">
+{% for key, name in themes %}<option value="{{key}}" {{'selected' if st.theme==key}}>{{name}}</option>{% endfor %}
+</select>
+<span class="mute">Auch unten in der Seitenleiste umschaltbar. Vier helle und vier dunkle Schemata;
+„Automatisch“ folgt der Systemeinstellung.</span>
+<noscript><button>Speichern</button></noscript>
+</form>
+</div>
+<script src="{{ url_for('static', filename='js/einstellungen.js') }}"></script>
+{% endblock %}

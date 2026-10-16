@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Jahresübersicht</h1>
+<form method="get" class="filters">
+<label class="mute">Jahr</label>
+<select name="y" class="autosubmit">
+{% for y in years %}<option {{'selected' if y==sel}}>{{y}}</option>{% endfor %}
+</select>
+<span class="mute">({{n_months}} Monate mit Daten)</span>
+</form>
+
+<div class="kpis">
+<div class="kpi"><span>Einnahmen {{sel}}</span>
+<a href="/transactions?year={{sel}}&{{ 'cat=' ~ inc_qs if inc_qs else 'kind=income' }}" class="nolink">
+<b class="pos">{{'%.2f'|format(tot_i)}} €</b></a></div>
+<div class="kpi"><span>Ausgaben {{sel}}</span>
+<a href="/transactions?year={{sel}}&{{ 'cat=' ~ exp_qs if exp_qs else 'kind=expense' }}" class="nolink">
+<b class="neg">{{'%.2f'|format(tot_e)}} €</b></a></div>
+<div class="kpi"><span>Saldo {{sel}}</span>
+<a href="/transactions?year={{sel}}" class="nolink">
+<b class="{{'pos' if saldo_y>=0 else 'neg'}}">{{'%.2f'|format(saldo_y)}} €</b></a></div>
+<div class="kpi"><span>Ø Ausgaben / Monat</span><b>{{'%.2f'|format(tot_e/n_months)}} €</b></div>
+<div class="kpi"><span>Ø übrig / Monat</span>
+<b class="{{'pos' if avg_leftover>=0 else 'neg'}}">{{'%.2f'|format(avg_leftover)}} €</b></div>
+<div class="kpi"><span>Ø {{inc_name}} / Monat</span><b>{{'%.2f'|format(avg_gehalt)}} €</b></div>
+</div>
+
+<div class="card"><h2 class="mt-0">Was kostet mich wieviel – {{sel}}</h2>
+<table><tr><th>Kategorie</th><th class="num">Jahr</th><th class="num">Ø / Monat</th>
+<th class="num">Anteil</th><th class="w-32p"></th></tr>
+{% for r in exp_rows %}{% set rowkey = loop.index %}<tr>
+<td>{% if r.children %}<button type="button" class="ghost tgl"
+  data-key="{{rowkey}}" aria-expanded="false" title="Unterkategorien aufklappen"
+ >▸</button>{% else %}<span class="expand-space"></span>{% endif %}{% set rlink = r.cat_id if r.cat_id else r.cat_ids %}{% if rlink %}<a
+   href="/transactions?year={{sel}}&cat={{rlink}}"
+   title="{{r.name}} in {{sel}} anzeigen" class="ink-inherit nolink">
+<i class="chip" style="background:{{r.color}}"></i>{{r.name}}</a>
+{% else %}<i class="chip" style="background:{{r.color}}"></i>{{r.name}}{% endif %}</td>
+<td class="num">{{'%.2f'|format(r.amount)}} €</td>
+<td class="num">{{'%.2f'|format(r.avg)}} €</td>
+<td class="num"><b>{{'%.1f'|format(r.pct)}} %</b></td>
+<td><div class="bar"><i style="width:{{r.pct}}%;background:{{r.color}}"></i></div></td>
+</tr>
+{% for c in r.children %}<tr class="sub-{{rowkey}}" hidden>
+<td class="pl-34">↳ <a href="/transactions?year={{sel}}&cat={{c.cat_id if c.cat_id else 'none'}}"
+   title="{{c.name}} in {{sel}} anzeigen" class="ink-inherit nolink">
+<i class="chip" style="background:{{c.color}}"></i>{% if c.name == r.name %}<span class="mute">ohne Unterkategorie</span>{% else %}{{c.name}}{% endif %}</a></td>
+<td class="num mute">{{'%.2f'|format(c.amount)}} €</td>
+<td class="num mute">{{'%.2f'|format(c.avg)}} €</td>
+<td class="num mute">{{'%.1f'|format(c.pct)}} %</td>
+<td><div class="bar"><i style="width:{{c.pct}}%;background:{{c.color}}"></i></div></td>
+</tr>{% endfor %}
+{% endfor %}
+<tr><td><b>Summe</b></td><td class="num"><b>{{'%.2f'|format(tot_e)}} €</b></td>
+<td class="num"><b>{{'%.2f'|format(tot_e/n_months)}} €</b></td><td class="num"><b>100 %</b></td><td></td></tr>
+</table></div>
+
+<div class="card"><h2 class="mt-0">Einnahmen {{sel}}</h2>
+<table><tr><th>Kategorie</th><th class="num">Jahr</th><th class="num">Ø / Monat</th></tr>
+{% for r in inc_rows %}<tr>
+<td><a href="/transactions?year={{sel}}&cat={{r.cat_id if r.cat_id else 'none'}}"
+   title="{{r.name}} in {{sel}} anzeigen" class="ink-inherit nolink">
+<i class="chip" style="background:{{r.color}}"></i>{{r.name}}</a></td>
+<td class="num">{{'%.2f'|format(r.amount)}} €</td>
+<td class="num">{{'%.2f'|format(r.avg)}} €</td>
+</tr>{% endfor %}</table></div>
+
+<div class="card"><h2 class="mt-0">Monat für Monat – {{sel}}</h2>
+<div class="overflow-x"><table><tr><th>Kategorie</th>
+{% for m in ymonths %}<th class="num">{{m[5:]}}</th>{% endfor %}<th class="num">Σ</th></tr>
+{% macro cell(v, m, cid, name) -%}
+<td class="num{{' pos' if v < 0}}">{% if v %}<a href="/transactions?month={{m}}&cat={{cid if cid else 'none'}}"
+  
+   title="{% if v < 0 %}{{name}}: in {{m}} netto {{'%.2f'|format(-v)}} € zurückbekommen{% else %}{{name}} in {{m}} anzeigen{% endif %}" class="ink-inherit nolink">{% if v < 0 %}+{{'%.0f'|format(-v)}}{% else %}{{'%.0f'|format(v)}}{% endif %}</a>
+{% else %}·{% endif %}</td>
+{%- endmacro %}
+{% macro sigma(v, cid, name) -%}
+<td class="num{{' pos' if v < 0}}"><a href="/transactions?year={{sel}}&cat={{cid if cid else 'none'}}"
+   title="{{name}} in {{sel}} anzeigen" class="ink-inherit nolink">
+<b>{% if v < 0 %}+{{'%.0f'|format(-v)}}{% else %}{{'%.0f'|format(v)}}{% endif %}</b></a></td>
+{%- endmacro %}
+{% for g in ygroups %}{% set mkey = 'm' ~ loop.index %}
+<tr>
+<td class="nowrap">{% if g.children %}<button type="button" class="ghost tgl"
+  data-key="{{mkey}}" aria-expanded="false" title="Unterkategorien aufklappen"
+ >▸</button>{% else %}<span class="expand-space"></span>{% endif %}<i class="chip" style="background:{{g.color}}"></i>{{g.name}}</td>
+{% for m in ymonths %}{{ cell(g.cells.get(m, 0), m, g.cat_ids, g.name) }}{% endfor %}
+{{ sigma(g.total, g.cat_ids, g.name) }}
+</tr>
+{% for c in g.children %}<tr class="sub-{{mkey}}" hidden>
+<td class="nowrap pl-34">↳ <i class="chip" style="background:{{c.color}}"></i>{% if c.name == 'ohne Unterkategorie' %}<span class="mute">{{c.name}}</span>{% else %}{{c.name}}{% endif %}</td>
+{% for m in ymonths %}{{ cell(c.cells.get(m, 0), m, c.cat_id, c.name) }}{% endfor %}
+{{ sigma(c.total, c.cat_id, c.name) }}
+</tr>{% endfor %}
+{% endfor %}
+</table></div>
+</div>
+
+{% endblock %}

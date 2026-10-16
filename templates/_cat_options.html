@@ -1,0 +1,16 @@
+{% macro options(cat_groups, selected_id, cat_by_id={}) %}
+{% set ns = namespace(found=false) %}
+{% for g in cat_groups %}
+{% if g.label %}<optgroup label="{{g.label}}">
+{% for c in g.options %}{% if selected_id and c.id==selected_id %}{% set ns.found = true %}{% endif %}<option value="{{c.id}}" {{'selected' if selected_id and c.id==selected_id}}>{{c.name}}</option>{% endfor %}
+{% if selected_id and cat_by_id.get(selected_id) and cat_by_id[selected_id].name == g.label %}
+{% set ns.found = true %}<option value="{{selected_id}}" selected>{{g.label}} (ohne Unterkategorie)</option>
+{% endif %}
+</optgroup>
+{% else %}{% for c in g.options %}{% if selected_id and c.id==selected_id %}{% set ns.found = true %}{% endif %}<option value="{{c.id}}" {{'selected' if selected_id and c.id==selected_id}}>{{c.name}}</option>{% endfor %}
+{% endif %}
+{% endfor %}
+{% if selected_id and not ns.found and cat_by_id.get(selected_id) %}
+<option value="{{selected_id}}" selected>{{cat_by_id[selected_id].name}}</option>
+{% endif %}
+{% endmacro %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Spalten zuordnen <small class="mute fw-normal fs-14">{{name}}</small></h1>
+
+<div class="card overflow-auto">
+<table class="colmap-preview"><tr>{% for i, h in cols %}<th>{{h}}</th>{% endfor %}</tr>
+{% for r in preview %}<tr>{% for c in r %}<td class="mute">{{c}}</td>{% endfor %}</tr>{% endfor %}
+</table>
+</div>
+
+{% macro colselect(field, chosen, required=False) %}
+<select name="{{field}}" id="cm-{{field}}" {% if required %}required{% endif %}>
+<option value="">–</option>
+{% for i, h in cols %}<option value="{{i}}" {{'selected' if chosen == i}}>{{h}}</option>{% endfor %}
+</select>
+{% endmacro %}
+<div class="card">
+<form method="post" class="colmap">
+<input type="hidden" name="t" value="{{token}}">
+<table>
+<tr><td><label for="cm-date">Datum</label></td><td>{{ colselect('date', guess.date, True) }}</td></tr>
+<tr><td><label><input type="radio" name="mode" value="single" {{'checked' if not split}}> Betrag</label></td>
+<td>{{ colselect('amount', guess.amount) }} <span class="mute" title="Minus = Ausgabe, Plus = Eingang">±</span></td></tr>
+<tr><td><label><input type="radio" name="mode" value="split" {{'checked' if split}}> Soll / Haben</label></td>
+<td>{{ colselect('debit', guess.debit) }} <span class="mute">Soll</span> &nbsp; {{ colselect('credit', guess.credit) }} <span class="mute">Haben</span></td></tr>
+<tr><td><label for="cm-partner">Empfänger</label></td><td>{{ colselect('partner', guess.partner) }}</td></tr>
+<tr><td><label for="cm-desc">Verwendungszweck</label></td><td>{{ colselect('desc', guess.desc) }}</td></tr>
+</table>
+<div class="mt-10 flex gap-10 items-center">
+<button title="Importiert die Datei jetzt; die Zuordnung gilt künftig für alle Dateien mit dieser Kopfzeile (Einstellungen → Datenquellen)">Importieren</button>
+<a class="btn ghost" href="/import">Abbrechen</a>
+</div>
+</form>
+</div>
+{% endblock %}

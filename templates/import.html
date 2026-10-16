@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Import <a class="help-link" href="/hilfe#auto" title="Hilfe zu dieser Seite" aria-label="Hilfe zu dieser Seite">?</a></h1>
+
+
+{% if hints and not result %}<div class="warn hints"><b>Hinweise</b>
+<ul class="m-4-0-0 pl-18">{% for h in hints %}<li class="hint" data-key="{{h.key}}">{% if h.href != '/import' %}<a href="{{h.href}}">{{h.text}}</a>{% else %}{{h.text}}{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+{% if result %}
+<div class="card border-accent">
+<h2 class="mt-0">Import-Ergebnis <span class="mute fw-normal fs-13">{{result.ts}}</span></h2>
+<table>
+<tr><th>Datei</th><th>Art</th><th class="num">neu</th><th class="num">bekannt</th><th class="num">entfernt</th></tr>
+{% for f in result.files %}<tr class="imp-file" data-file="{{f.name}}" data-group="{{f.group}}" data-kind="{{f.kind}}" data-new="{{f.new}}" data-skipped="{{f.skipped}}" data-removed="{{f.removed}}">
+<td>{{f.name}}</td>
+{% if f.error %}<td colspan="4" class="neg">{{f.error}}{% if f.token %} – <a href="/import/zuordnen?t={{f.token}}" class="colmap-link">Spalten zuordnen …</a>{% endif %}</td>
+{% else %}<td>{{f.label}}{% if f.group %} <span class="mute">Gruppe {{f.group}}</span>{% endif %}{% if f.card_hint and 'card' in nav_sources %}
+<br><span class="mute" title="Dateiname klingt nach Kartenkonto – wenn das Kreditkartenumsätze sind, die Datei mit Format „Kreditkarte“ nochmal hochladen; die eben angelegten Zeilen unter Alle Zahlungen (Quelle Bank) löschen">als Kontoauszug importiert – Kartenkonto? Format „Kreditkarte“ wählen</span>{% endif %}</td>
+<td class="num"><b>{{f.new}}</b></td><td class="num mute">{{f.skipped}}</td>
+<td class="num mute">{{f.removed if f.removed else '·'}}</td>{% endif %}
+</tr>{% endfor %}
+</table>
+<div class="kpis m-10-0-4">
+<div class="kpi"><span>Neue Buchungen</span><b>{{result.total_new}}</b></div>
+{% if result.todo %}<div class="kpi border-amber"><span>Zum Durchgehen</span>
+<b>{{result.todo}}</b><a href="/review"><b>jetzt durchgehen →</b></a></div>
+{% else %}<div class="kpi"><span>Zum Durchgehen</span><b>0</b><span class="mute">alles zugeordnet</span></div>{% endif %}
+</div>
+{% if result.steps %}
+<h3 class="m-10-0-4">Automatisch erledigt</h3>
+<ul class="imp-steps m-0 pl-0 nolist">
+{% for st in result.steps %}<li data-step="{{st.key}}" data-n="{{st.n}}" class="p-2-0"><b class="inline-block minw-34 ta-r mr-8">{{st.n}}</b>{{st.text}}</li>
+{% endfor %}</ul>
+{% elif result.total_new %}<p class="mute m-8-0-0">Nichts automatisch zu tun – alles Neue wartet unter Durchgehen.</p>
+{% elif result.files|selectattr('error')|list %}<p class="mute m-8-0-0">Aus dieser Datei wurde nichts übernommen – siehe Fehler oben.</p>
+{% elif result.files|sum(attribute='skipped') %}<p class="mute m-8-0-0">Nichts Neues – alle Zeilen waren schon da.</p>
+{% else %}<p class="mute m-8-0-0">Nichts übernommen – die Datei enthielt keine lesbaren Buchungen (Datum + Betrag).</p>{% endif %}
+{% for g in result.reopened %}<div class="warn mt-8">Splitwise-Gruppe <b>{{g}}</b> war
+geschlossen und wurde wieder geöffnet – es gibt neue Bewegungen.</div>{% endfor %}
+{% if result.warnings %}
+<div class="warn mt-10"><b>Bitte prüfen</b>
+<ul class="m-4-0-0 pl-18">{% for w in result.warnings %}<li>{{w}}</li>{% endfor %}</ul></div>
+{% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+<form method="post" enctype="multipart/form-data">
+<input type="file" name="files" accept=".csv,.CSV,.xlsx" multiple required title="Mehrere Dateien auf einmal; das Format wird erkannt, Doppeltes übersprungen" class="p-30 border-dashed rounded w-full">
+<div class="mt-10 flex gap-10 items-center wrap">
+<button class="fs-16 p-10-22">Alle Dateien importieren</button>
+<label class="mute">Format
+<select name="force_kind">
+<option value="">automatisch erkennen</option>
+<option value="bank">Bankkonto</option>
+{% if 'card' in nav_sources %}<option value="card">Kreditkarte</option>{% endif %}
+{% if 'paypal' in nav_sources %}<option value="paypal">PayPal</option>{% endif %}
+{% if 'splitwise' in nav_sources %}<option value="splitwise">Splitwise</option>{% endif %}
+<option value="depot">Depot (Flatex)</option>
+</select></label>
+</div>
+</form>
+</div>
+
+<div class="kpis">
+<div class="kpi"><span>Kontoauszug</span><b>{{counts.get('bank',0)}}</b>
+{% if latest.get('bank') %}<span class="mute">bis {{latest['bank']}}</span>{% endif %}</div>
+{% if 'paypal' in nav_sources %}
+<div class="kpi"><span>PayPal</span><b>{{counts.get('paypal',0)}}</b>
+{% if latest.get('paypal') %}<span class="mute">bis {{latest['paypal']}}</span>{% endif %}</div>{% endif %}
+{% if 'card' in nav_sources %}
+<div class="kpi"><span>Kreditkarte</span><b>{{counts.get('card',0)}}</b>
+{% if latest.get('card') %}<span class="mute">bis {{latest['card']}}</span>{% endif %}</div>{% endif %}
+{% if 'splitwise' in nav_sources %}
+<div class="kpi"><span>Splitwise</span><b>{{counts.get('splitwise',0)}}</b>
+{% if latest.get('splitwise') %}<span class="mute">bis {{latest['splitwise']}}</span>{% endif %}</div>{% endif %}
+{% if counts.get('depot') %}
+<div class="kpi"><span>Depot</span><b>{{counts['depot']}}</b>
+{% if latest.get('depot') %}<span class="mute">bis {{latest['depot']}}</span>{% endif %}</div>{% endif %}
+{% if n_todo %}<div class="kpi border-amber">
+<span>Zum Durchgehen</span><b>{{n_todo}}</b>
+<a href="/review">jetzt durchgehen →</a></div>{% endif %}
+</div>
+{% if imports %}
+<details class="card card-toggle" data-persist="import-history">
+<summary><h2>Import-Historie <span class="pill">{{imports|length}}</span></h2></summary>
+<table><tr><th>Wann</th><th>Datei</th><th>Art</th><th class="num">neu</th>
+<th class="num">bekannt</th><th class="num">entfernt</th><th></th></tr>
+{% for i in imports %}<tr{% if i.kind == '?' or (i.note or '').startswith('Fehler') %} class="mute"{% endif %}>
+<td class="nowrap">{{i.ts}}</td><td>{{i.filename}}</td>
+<td>{{ {'bank':'Kontoauszug','card':'Kreditkarte','paypal':'PayPal','splitwise':'Splitwise','depot':'Depot'}.get(i.kind, '–') }}</td>
+<td class="num">{{i.new_rows}}</td><td class="num">{{i.skipped}}</td>
+<td class="num">{{i.removed if i.removed else '·'}}</td>
+<td class="mute">{{i.note}}</td></tr>{% endfor %}
+</table>
+</details>
+{% endif %}
+{% endblock %}

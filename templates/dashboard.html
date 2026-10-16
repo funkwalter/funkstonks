@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block head %}<script src="{{ url_for('static', filename='echarts.min.js') }}"></script>
+<style>
+/* User request 2026-08-07: "dashboard kann gerne die ganze breite einnehmen
+   von der website" (the dashboard may use the full page width) - only the
+   dashboard and investments pages override the global main max-width
+   (1180px, style.css), all other pages stay narrow. */
+main{max-width:100%}
+</style>
+{% endblock %}
+{% from "_period.html" import period_picker %}
+{% block content %}
+{% set first = sel_months[0] if sel_months else '' %}
+{% set last = sel_months[-1] if sel_months else '' %}
+{% set single = sel_months|length == 1 %}
+<div class="page-head">
+<h1>Dashboard</h1>
+<div class="filters m-0 items-center gap-12">
+<span class="mute">{% if months %}{{period}}{% if not single %} · {{n_months}} Monate{% endif %}{% endif %}{% if partial_note %} <small class="partial-note" title="Die Vergleichswerte des Vorzeitraums gehen nur bis zum selben Tag">({{partial_note}})</small>{% endif %}</span>
+</div>
+</div>
+{% if not months %}
+<div class="card first-steps">
+<h2 class="mt-0">Erste Schritte</h2>
+<ol class="m-0-0-10-18 p-0 lh-17">
+<li><b>Export holen:</b> im Online-Banking die Umsätze als CSV herunterladen (<a href="/hilfe#exporte">wo genau</a>).</li>
+<li><b>Importieren:</b> die Datei unter <a href="/import">Import</a> hochladen – das Format wird erkannt.</li>
+<li><b>Durchgehen:</b> offene Zahlungen einmal zuordnen, „Regel merken“ anhaken – ab dann läuft es von selbst.</li>
+</ol>
+<form method="post" action="/demo" class="inline">
+<button class="ghost">Erst mit Beispieldaten ansehen</button></form>
+<span class="mute ml-10">Vier Monate erfundener Buchungen, jederzeit wieder entfernbar.</span>
+</div>
+{% endif %}
+{% if hints %}<div class="warn hints"><b>Hinweise</b>
+<ul class="m-4-0-0 pl-18">{% for h in hints %}<li class="hint" data-key="{{h.key}}"><a href="{{h.href}}">{{h.text}}</a></li>{% endfor %}</ul></div>{% endif %}
+
+<div class="kpis">
+<div class="kpi"><span>Einnahmen {{period}}</span>
+<a href="{{urls.inc}}" class="nolink">
+<b class="pos">{{'%.2f'|format(total_inc)}} €</b></a>
+{% if n_months > 1 %}<span class="mute">Ø {{'%.2f'|format(total_inc/n_months)}} € / Monat</span>{% endif %}
+{% if prev.n %}<div class="kpi-delta {{ 'pos' if total_inc - prev.inc > 0.004 else ('neg' if total_inc - prev.inc < -0.004 else 'mute') }}">{{'%+.2f'|format(total_inc - prev.inc)}} € vs. <a href="/?{{prev.qs}}" class="prev-link" title="Dashboard des Vorzeitraums">{{prev.label}}</a></div>{% endif %}</div>
+<div class="kpi"><span>Ausgaben {{period}}</span>
+<a href="{{urls.exp}}" title="Ohne Investitionen – die stehen rechts daneben" class="nolink">
+<b class="neg">{{'%.2f'|format(total_exp)}} €</b></a>
+{% if n_months > 1 %}<span class="mute">Ø {{'%.2f'|format(total_exp/n_months)}} € / Monat</span>{% endif %}
+{% if prev.n %}<div class="kpi-delta {{ 'neg' if total_exp - prev.exp > 0.004 else ('pos' if total_exp - prev.exp < -0.004 else 'mute') }}">{{'%+.2f'|format(total_exp - prev.exp)}} € vs. <a href="/?{{prev.qs}}" class="prev-link" title="Dashboard des Vorzeitraums">{{prev.label}}</a></div>{% endif %}</div>
+<div class="kpi kpi-invest"><span>Investiert {{period}}</span>
+<a href="{{urls.invest}}" class="nolink">
+<b class="invest">{{'%.2f'|format(invest_total)}} €</b></a>
+{% if total_inc > 0.004 %}<span class="mute">{{'%.1f'|format(100*invest_total/total_inc)}} % der Einnahmen{% if n_months > 1 %} · Ø {{'%.2f'|format(invest_total/n_months)}} € / Monat{% endif %}</span>{% endif %}
+{% if prev.n %}<div class="kpi-delta {{ 'invest' if invest_total - prev_invest > 0.004 else ('neg' if invest_total - prev_invest < -0.004 else 'mute') }}">{{'%+.2f'|format(invest_total - prev_invest)}} € vs. <a href="/?{{prev.qs}}" class="prev-link" title="Dashboard des Vorzeitraums">{{prev.label}}</a></div>{% endif %}
+{% if depot and depot.n %}<div title="Bestand × Kurs, Kurse vom {{depot.oldest}}" class="fs-12">Depotwert <b class="invest">{{'%.2f'|format(depot.value)}} €</b>
+<span class="{{'pos' if depot.gain > 0.004 else ('neg' if depot.gain < -0.004 else 'mute')}}">{{'%+.2f'|format(depot.gain)}} €</span> <span class="mute">{{depot.oldest}}</span></div>{% endif %}
+<a href="/investitionen">Details →</a></div>
+<div class="kpi"><span>Saldo</span>
+<a href="{{urls.saldo}}" class="nolink">
+<b class="{{'pos' if saldo>=0 else 'neg'}}">
+{{'%.2f'|format(saldo)}} €</b></a>
+{% if n_months > 1 %}<span class="mute">Ø {{'%.2f'|format(saldo/n_months)}} € / Monat</span>{% endif %}
+{% if prev.n %}<div class="kpi-delta {{ 'pos' if saldo - prev.saldo > 0.004 else ('neg' if saldo - prev.saldo < -0.004 else 'mute') }}">{{'%+.2f'|format(saldo - prev.saldo)}} € vs. <a href="/?{{prev.qs}}" class="prev-link" title="Dashboard des Vorzeitraums">{{prev.label}}</a></div>{% endif %}</div>
+<div class="kpi"><span>Laufende Kosten / Monat</span>
+<b>{{'%.2f'|format(fix_monthly)}} €</b>
+<a href="/fixkosten">Details →</a></div>
+</div>
+
+{% if months %}
+<div class="chart-wrap">
+<div class="chart-tools">{{ period_picker(months, years, sel_range, first, last, "dash", period, quick="/") }}</div>
+<details class="card card-toggle" data-persist="dash-sankey" open>
+<summary><h2>Geldfluss {{period}}</h2></summary>
+<div id="sankey" class="h-720"></div>
+</details>
+</div>
+
+<details class="card card-toggle" data-persist="dash-cats" open>
+<summary><h2>Ausgaben nach Kategorie <small class="mute fw-normal">ohne Investitionen</small> – {{period}}</h2></summary>
+<table><tr><th>Kategorie</th><th class="num">Betrag</th><th class="num">Anteil</th><th class="w-34p"></th></tr>
+{% for r in table %}{% set tkey = 't' ~ loop.index %}<tr>
+<td>{% if r.children %}<button type="button" class="ghost tgl" data-key="{{tkey}}"
+  aria-expanded="true" title="Unterkategorien zuklappen"
+ >▾</button>{% else %}<span class="expand-space"></span>{% endif %}{% set rlink = r.cat_id if r.cat_id else r.cat_ids %}{% if rlink %}<a href="/transactions?{{period_qs}}&cat={{rlink}}"
+   title="Zahlungen in {{r.name}} ({{period}}) anzeigen" class="ink-inherit nolink">
+<i class="chip" style="background:{{r.color}}"></i>{{r.name}}</a>
+{% else %}<i class="chip" style="background:{{r.color}}"></i>{{r.name}}{% endif %}</td>
+<td class="num">{{'%.2f'|format(r.amount)}} €</td>
+<td class="num">{{'%.1f'|format(r.pct)}} %</td>
+<td><div class="bar"><i style="width:{{r.pct}}%;background:{{r.color}}"></i></div></td>
+</tr>
+{% for c in r.children %}<tr class="sub-{{tkey}}">
+<td class="pl-34">↳ <a href="/transactions?{{period_qs}}&cat={{c.cat_id if c.cat_id else 'none'}}"
+   title="Zahlungen in {{c.name}} ({{period}}) anzeigen" class="ink-inherit nolink">
+<i class="chip" style="background:{{c.color}}"></i>{% if c.name == r.name %}<span class="mute">ohne Unterkategorie</span>{% else %}{{c.name}}{% endif %}</a></td>
+<td class="num mute">{{'%.2f'|format(c.amount)}} €</td>
+<td class="num mute">{{'%.1f'|format(c.pct)}} %</td>
+<td><div class="bar"><i style="width:{{c.pct}}%;background:{{c.color}}"></i></div></td>
+</tr>{% endfor %}
+{% endfor %}
+<tr><td><b>Summe</b></td><td class="num"><b>{{'%.2f'|format(total_exp)}} €</b></td>
+<td class="num"><b>100 %</b></td><td></td></tr>
+</table>
+</details>
+{% endif %}
+
+
+<script type="application/json" id="sankey-data" data-period-qs="{{period_qs}}">{{ sankey|tojson }}</script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

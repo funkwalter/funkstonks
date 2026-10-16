@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Laufende Kosten <a class="help-link" href="/hilfe#seiten" title="Hilfe zu dieser Seite" aria-label="Hilfe zu dieser Seite">?</a></h1>
+
+<div class="kpis">
+<div class="kpi"><span>Gesamt / Monat</span><b class="neg">{{'%.2f'|format(sums.total)}} €</b></div>
+<div class="kpi"><span>Wohnen / Monat</span><b>{{'%.2f'|format(sums.wohnen)}} €</b></div>
+<div class="kpi"><span>Privat / Monat</span><b>{{'%.2f'|format(sums.privat)}} €</b></div>
+</div>
+
+{% macro override_btn(s) %}
+<form method="post" action="/fixkosten/override" class="inline series-override"
+ {% if not s.forced %}data-confirm="„{{s.partner[:40]}}“ aus den laufenden Kosten ausblenden?"{% endif %}>
+<input type="hidden" name="key" value="{{s.key}}"><input type="hidden" name="label" value="{{s.partner[:60]}}">
+{% if s.forced %}<input type="hidden" name="mode" value="clear">
+<button class="ghost fs-11 p-2-7" title="Von Hand aufgenommen – Klick nimmt die Entscheidung zurück">manuell ✕</button>
+{% else %}<input type="hidden" name="mode" value="hide">
+<button class="ghost fs-11 p-2-7" title="Gehört nicht zu den laufenden Kosten – ausblenden" aria-label="{{s.partner[:40]}} ausblenden">✕</button>{% endif %}
+</form>
+{% endmacro %}
+
+{% macro series_table(rows, title, total) %}
+<table class="series"><colgroup><col class="w-29p"><col class="w-12p"><col class="w-9p">
+<col class="w-11p"><col class="w-9p"><col class="w-9p"><col class="w-12p"><col class="w-4p"><col class="w-7p"></colgroup>
+<tr><th>Empfänger</th><th>Kategorie</th><th>Rhythmus</th>
+<th class="num">Betrag / Monat</th><th class="num">Typisch</th><th class="num">Ø bisher</th>
+<th class="num">zuletzt</th><th class="num" title="Zahlungen">#</th><th></th></tr>
+{% for s in rows %}<tr class="series-row" data-key="{{s.key}}">
+{% set qterm = s.match[0] if (s.match and s.match[0]) else s.partner %}
+<td><a href="/transactions?q={{qterm|urlencode}}" class="series-link"
+   title="Alle Zahlungen dieser Serie anzeigen{% if s.rule %} (Regel: {{s.rule}}){% endif %}">{{s.partner[:44]}}</a>{% if s.forced %} <span class="pill" title="Von Hand als laufende Kosten aufgenommen">manuell</span>{% endif %}
+{% if s.repaid %}<br><span class="mute fs-11" title="Eingehende Zahlungen, die mit dieser Serie verrechnet sind">Rückflüsse −{{'%.2f'|format(s.repaid)}} €</span>{% endif %}</td>
+<td><i class="chip" style="background:{{s.cat_color}}"></i>{{s.cat_name}}</td>
+<td>{{s.interval}}</td>
+<td class="num"><b title="{% if s.monthly == s.amount and s.amount != s.last_amount %}Typischer Betrag – die Rechnungen schwanken (zuletzt {{'%.2f'|format(s.last_amount)}} €){% elif s.interval == 'quartalsweise' %}Letzte Zahlung ÷ 3 (quartalsweise){% else %}Letzte Zahlung{% endif %}{% if s.repaid %} – nach Rückzahlungen{% endif %}">{{'%.2f'|format(s.monthly)}} €</b>{% if s.shared and s.full_amount - s.monthly > 0.004 and s.interval == 'monatlich' %}
+<br><span class="mute fs-11" title="Volle Rechnung, dein Anteil steht darüber">von {{'%.2f'|format(s.full_amount)}} €</span>{% endif %}</td>
+<td class="num">{{'%.2f'|format(s.amount)}} €</td>
+<td class="num">{{'%.2f'|format(s.avg_all)}} €</td>
+<td class="num">{{s.last_date}} <span class="mute">({{'%.2f'|format(s.last_amount)}} €)</span></td>
+<td class="num">{{s.n}}</td>
+<td class="num overflow-visible nowrap"><a href="/fixkosten/serie?key={{s.key|urlencode}}" class="series-edit" aria-label="{{s.partner[:40]}} bearbeiten"
+   title="Bearbeiten: Eingänge zuordnen, Zahlungen dazunehmen">✎</a> {{ override_btn(s) }}</td>
+</tr>{% endfor %}
+<tr><td colspan="3"><b>Summe {{title}}</b></td>
+<td class="num"><b>{{'%.2f'|format(total)}} €</b></td><td></td><td></td><td></td><td></td><td></td></tr>
+</table>
+{% endmacro %}
+
+<div class="card"><h2 class="mt-0">Wohnen</h2>
+{% if not wohnen %}<div class="mute">Keine wiederkehrenden Zahlungen erkannt.</div>
+{% else %}{{ series_table(wohnen, 'Wohnen', sums.wohnen) }}{% endif %}</div>
+
+<div class="card"><h2 class="mt-0">Privat</h2>
+{% if not privat %}<div class="mute">Keine wiederkehrenden Zahlungen erkannt.</div>
+{% else %}{{ series_table(privat, 'Privat', sums.privat) }}{% endif %}</div>
+
+<details class="card card-toggle" data-persist="fix-candidates" {{'open' if (candidates or suche)}}>
+<summary><h2>Vorschläge: läuft das regelmäßig? <span class="pill">{{candidates|length}}</span></h2></summary>
+<form method="get" action="/fixkosten#suche" class="filters mb-8" id="suche">
+<input type="search" name="suche" value="{{suche}}" placeholder="Empfänger suchen und aufnehmen …" aria-label="Empfänger suchen" class="minw-260">
+<button class="ghost">suchen</button>{% if suche %} <a href="/fixkosten" class="mute">zurücksetzen</a>{% endif %}
+</form>
+{% if suche %}
+{% if found %}
+<table class="found"><tr><th>Empfänger</th><th>Kategorie</th><th class="num">Zahlungen</th><th class="num">zuletzt</th><th class="num">gesamt</th><th></th></tr>
+{% for g in found %}<tr class="found-row" data-key="{{g.key}}">
+<td><a href="/transactions?q={{g.partner|urlencode}}" class="series-link">{{g.partner[:44]}}</a></td>
+<td>{{g.cat_name}}</td><td class="num">{{g.n}}</td>
+<td class="num">{{g.last_date}} <span class="mute">({{'%.2f'|format(g.last_amount)}} €)</span></td>
+<td class="num">{{'%.2f'|format(g.total)}} €</td>
+<td class="num"><form method="post" action="/fixkosten/override" class="inline">
+<input type="hidden" name="key" value="{{g.key}}"><input type="hidden" name="label" value="{{g.partner[:60]}}"><input type="hidden" name="mode" value="force">
+<button class="ghost fs-11 p-2-7">Aufnehmen</button></form></td>
+</tr>{% endfor %}</table>
+{% else %}<div class="mute mb-8">Nichts gefunden zu „{{suche}}“ – gesucht wird in Empfängern mit mindestens zwei Zahlungen, die noch keine Serie sind.</div>{% endif %}
+<h3 class="m-10-0-4">Vorschläge</h3>
+{% endif %}
+{% if candidates %}
+<table><tr><th>Empfänger</th><th>Kategorie</th><th class="num">Zahlungen</th><th class="num">zuletzt</th><th class="num">gesamt</th><th></th></tr>
+{% for g in candidates %}<tr class="cand-row" data-key="{{g.key}}">
+<td><a href="/transactions?q={{g.partner|urlencode}}" class="series-link">{{g.partner[:44]}}</a></td>
+<td>{{g.cat_name}}</td>
+<td class="num">{{g.n}}</td>
+<td class="num">{{g.last_date}} <span class="mute">({{'%.2f'|format(g.last_amount)}} €)</span></td>
+<td class="num">{{'%.2f'|format(g.total)}} €</td>
+<td class="num nowrap">
+<form method="post" action="/fixkosten/override" class="inline">
+<input type="hidden" name="key" value="{{g.key}}"><input type="hidden" name="label" value="{{g.partner[:60]}}"><input type="hidden" name="mode" value="force">
+<button class="ghost fs-11 p-2-7">Aufnehmen</button></form>
+<form method="post" action="/fixkosten/override" class="inline">
+<input type="hidden" name="key" value="{{g.key}}"><input type="hidden" name="label" value="{{g.partner[:60]}}"><input type="hidden" name="mode" value="dismiss">
+<button class="ghost fs-11 p-2-7" title="Nicht mehr vorschlagen" aria-label="{{g.partner[:40]}} nicht mehr vorschlagen">✕</button></form>
+</td>
+</tr>{% endfor %}
+</table>
+{% else %}<div class="mute">Keine Vorschläge – alles in deinen Fixkosten-Kategorien ist schon als Serie erkannt oder weggeklickt.</div>{% endif %}
+</details>
+
+{% if beendet %}
+<div class="card"><h2 class="mt-0">Nicht mehr aktiv</h2>
+<table><tr><th>Empfänger</th><th>Kategorie</th><th class="num">zuletzt</th>
+<th class="num">war / Monat</th><th class="num">Zahlungen</th><th></th></tr>
+{% for s in beendet %}<tr class="mute series-row" data-key="{{s.key}}">
+{% set qterm = s.match[0] if (s.match and s.match[0]) else s.partner %}
+<td><a href="/transactions?q={{qterm|urlencode}}" class="series-link"
+   title="Alle Zahlungen dieser Serie anzeigen{% if s.rule %} (Regel: {{s.rule}}){% endif %}">{{s.partner[:44]}}</a>{% if s.forced %} <span class="pill">manuell</span>{% endif %}</td>
+<td><i class="chip" style="background:{{s.cat_color}}"></i>{{s.cat_name}}</td>
+<td class="num">{{s.last_date}} <span class="fs-11">(vor {{s.days_since}} Tagen)</span></td>
+<td class="num">{{'%.2f'|format(s.monthly)}} €</td>
+<td class="num">{{s.n}}</td>
+<td class="num">{{ override_btn(s) }}</td>
+</tr>{% endfor %}
+</table></div>
+{% endif %}
+
+{% if hidden %}
+<details class="card card-toggle" data-persist="fix-hidden">
+<summary><h2>Ausgeblendet <span class="pill">{{hidden|length}}</span></h2></summary>
+<table><tr><th>Empfänger</th><th>Kategorie</th><th class="num">zuletzt</th><th class="num">wäre / Monat</th><th></th></tr>
+{% for s in hidden %}<tr class="mute series-row hidden-row" data-key="{{s.key}}">
+<td>{{s.partner[:44]}}</td>
+<td><i class="chip" style="background:{{s.cat_color}}"></i>{{s.cat_name}}</td>
+<td class="num">{{s.last_date}}</td>
+<td class="num">{{'%.2f'|format(s.monthly)}} €</td>
+<td class="num"><form method="post" action="/fixkosten/override" class="inline">
+<input type="hidden" name="key" value="{{s.key}}"><input type="hidden" name="label" value="{{s.partner[:60]}}">
+<input type="hidden" name="mode" value="clear"><button class="ghost fs-11 p-2-7">wieder anzeigen</button></form></td>
+</tr>{% endfor %}
+</table></details>
+{% endif %}
+
+{% endblock %}

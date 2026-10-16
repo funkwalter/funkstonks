@@ -1,0 +1,5 @@
+# LF everywhere (ruff format demands it; a CRLF checkout on 2026-10-15 broke the pre-commit hook)
+* text=auto eol=lf
+*.sh text eol=lf
+*.command text eol=lf
+.githooks/* text eol=lf

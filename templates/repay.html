@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Rückzahlung verknüpfen</h1>
+<div class="card maxw-820">
+<div class="flex between items-baseline wrap gap-8">
+<div><b>{{inc.partner or '—'}}</b> · {{inc.booking_date}} · <span class="pill">{{inc.source}}</span><br>
+<span class="mute">{{inc.description[:100]}}</span></div>
+<div class="num pos fs-22 bold">+{{'%.2f'|format(inc.amount)}} €</div>
+</div>
+
+<form method="get" class="m-14-0 flex gap-8">
+<input type="hidden" name="back" value="{{back}}">
+<input type="search" name="q" value="{{q}}" aria-label="Ausgaben nach Empfänger oder Verwendungszweck eingrenzen" placeholder="Optional: nach Empfänger/Verwendungszweck eingrenzen" class="flex-1 p-6">
+<button type="submit" class="ghost">Suchen</button>
+</form>
+
+<form method="post" id="repay-form">
+<input type="hidden" name="back" value="{{back}}">
+<table>
+<tr><th></th><th>Datum</th><th>Quelle</th><th>Ausgabe</th><th class="num">Betrag</th><th class="num">zählt derzeit</th></tr>
+{% for c in linked_rows %}
+<tr>
+<td><input type="checkbox" name="tx_ids" value="{{c.id}}" class="link-cb" aria-label="{{c.partner}} {{c.booking_date}} verknüpft lassen" data-amt="{{ '%.2f'|format((-(c.effective_amount if c.effective_amount is not none else c.amount)) + c.delta) }}" checked></td>
+<td class="num">{{c.booking_date}}</td>
+<td><span class="pill">{{c.source}}</span></td>
+<td>{{c.partner}}{% if c.description %} · <span class="mute">{{c.description[:50]}}</span>{% endif %}
+<span class="pill">verknüpft, −{{'%.2f'|format(c.delta)}} €</span></td>
+<td class="num neg">{{'%.2f'|format(c.amount)}} €</td>
+<td class="num">{{'%.2f'|format(c.effective_amount if c.effective_amount is not none else c.amount)}} €</td>
+</tr>
+{% endfor %}
+{% if linked_rows and candidates %}
+<tr><td colspan="6" class="mute pt-10">Weitere mögliche Ausgaben:</td></tr>
+{% endif %}
+{% for c in candidates %}
+<tr>
+<td><input type="checkbox" name="tx_ids" value="{{c.id}}" class="link-cb" aria-label="{{c.partner}} {{c.booking_date}} auswählen" data-amt="{{ '%.2f'|format(-(c.effective_amount if c.effective_amount is not none else c.amount)) }}"></td>
+<td class="num">{{c.booking_date}}</td>
+<td><span class="pill">{{c.source}}</span></td>
+<td>{{c.partner}}{% if c.description %} · <span class="mute">{{c.description[:50]}}</span>{% endif %}</td>
+<td class="num neg">{{'%.2f'|format(c.amount)}} €</td>
+<td class="num">{{'%.2f'|format(c.effective_amount if c.effective_amount is not none else c.amount)}} €</td>
+</tr>
+{% endfor %}
+{% if not linked_rows and not candidates %}<tr><td colspan="6" class="mute">Keine offene Ausgabe gefunden – Suchbegriff anpassen.</td></tr>{% endif %}
+</table>
+<div class="mt-12 flex items-center gap-14 wrap">
+<button type="submit">Speichern</button>
+<a class="btn ghost" href="{{back}}">Abbrechen</a>
+<span class="mute">Offener Betrag der Auswahl: <b id="sel-sum">0.00 €</b> · Rückzahlung: {{'%.2f'|format(inc.amount)}} €
+<span id="sel-warn" class="warn-inline" data-amount="{{inc.amount}}" hidden> – reicht nicht, eine Ausgabe mehr wählen</span></span>
+</div>
+</form>
+</div>
+<script src="{{ url_for('static', filename='js/repay.js') }}"></script>
+{% endblock %}

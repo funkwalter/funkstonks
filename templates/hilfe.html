@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="hilfe">
+<h1>Hilfe <span class="pill" title="Version der App">v{{ app_version }}</span></h1>
+<form method="post" class="filters m-0-0-10 gap-14 items-center" id="quellen">
+<span class="mute">Ich nutze:</span>
+<label title="Bankkonto ist immer dabei"><input type="checkbox" checked disabled> Bankkonto</label>
+{% for key, label, hint in sources if key != 'bank' %}<label title="{{hint}}"><input type="checkbox" name="src_{{key}}" value="1" {{'checked' if key in enabled}} class="autosubmit"> {{label}}</label>{% endfor %}
+</form>
+<p class="jump mute">
+<a href="#start">Einstieg</a>
+<a href="#monat">Jeden Monat</a>
+<a href="#seiten">Die Seiten</a>
+<a href="#exporte">Exporte</a>
+<a href="#auto">Was automatisch passiert</a>
+<a href="#einstellungen">Einstellungen</a>
+<a href="#probleme">Probleme</a>
+</p>
+
+<div class="card" id="start">
+<h2>Einstieg</h2>
+<ol>
+<li><b>Exporte holen.</b> Kontoauszug als CSV aus dem Online-Banking; dazu optional PayPal, Kreditkarte, Splitwise, Flatex (<a href="#exporte">wo genau</a>).</li>
+<li><b>Importieren.</b> Alle Dateien auf einmal unter <a href="/import">Import</a> hochladen. Das Format wird erkannt, Doppeltes übersprungen.</li>
+<li><b>Durchgehen.</b> Jede offene Zahlung einmal einer Kategorie zuordnen (Tasten 1–9). „Regel merken“ anhaken, dann passiert es beim nächsten Mal von selbst.</li>
+<li><b>Anschauen.</b> Dashboard, Investitionen, Jahr, Laufende Kosten. Jede Zahl ist anklickbar und führt zu den Zahlungen dahinter.</li>
+</ol>
+<p class="mute">Ohne eigene Daten: auf dem leeren Dashboard „Erst mit Beispieldaten ansehen“ – erfundene Buchungen, jederzeit entfernbar.
+Alles liegt in einer Datei neben dem Programm, nichts verlässt den Rechner.</p>
+</div>
+
+<div class="card" id="monat">
+<h2>Jeden Monat</h2>
+<ol>
+<li>Neue Exporte ziehen (Zeitraum seit dem letzten Import, Überschneidung ist egal).</li>
+<li>Importieren. Das Ergebnis zeigt, was neu ist und was die App automatisch erledigt hat.</li>
+<li>Den Rest durchgehen – mit Regeln meist nur eine Handvoll Zahlungen.</li>
+</ol>
+<p>Fehlt ein Export oder passt etwas nicht, steht ein Zähler an <b>Import</b> bzw. <b>Splitwise</b> in der Seitenleiste und ein Hinweis im Dashboard.</p>
+</div>
+
+<div class="card" id="seiten">
+<h2>Die Seiten</h2>
+<table>
+<tr><td>Dashboard</td><td>Einnahmen, Ausgaben (ohne Investitionen), Investiert, Saldo und laufende Kosten für den gewählten Zeitraum. Flussdiagramm,
+Ausgaben nach Kategorie; an den Kacheln die Veränderung zum gleich langen Zeitraum davor (ein angebrochener Monat wird nur bis zum selben Tag verglichen).
+Zeitraum rechts oben am Diagramm: 1M / 3M / 6M / 1J / Gesamt oder frei. Karten lassen sich zuklappen; der Zustand bleibt gespeichert.</td></tr>
+<tr><td>Investitionen</td><td>Drei Ansichten Monat für Monat: <b>Cashflow</b> (Einnahmen, Ausgaben, Investiert, Saldo in Euro),
+<b>Anteile</b> (Einnahmen = 100 %: wie viel ausgegeben, investiert, übrig) und <b>Kumuliert</b> (Überweisungen ins Depot, Depot-Einstand, Depotwert zu Kursen und Saldo, aufsummiert). Ein angebrochener Monat ist mit * markiert. Schnellwahl 1M / 3M / 6M / 1J / Gesamt. Darunter das Depot aus den Flatex-Umsätzen:
+Stück, investierte Summe, Ø-Kaufkurs, und nach „Kurse aktualisieren“ Kurs, Wert und Gewinn je Position – das ist der einzige Moment, in dem die App
+ins Internet geht (Yahoo Finance, nur für deine Positionen – auf Klick und, wenn eingeschaltet, einmal täglich beim Start). Kennt Yahoo ein Papier nicht, trägst du den Kurs darunter von Hand ein.</td></tr>
+<tr><td>Jahr</td><td>Summen und Ø pro Monat je Kategorie, Matrix Monat × Kategorie.</td></tr>
+<tr><td>Vergleich</td><td>Zwei beliebige Zeiträume nebeneinander, je Kategorie mit Differenz.</td></tr>
+<tr><td>Laufende Kosten</td><td>Erkannte Abos und Fixkosten mit Betrag pro Monat. ✕ blendet eine Position aus, „Vorschläge“ listet, was die
+Erkennung noch nicht akzeptiert hat (Aufnehmen oder wegklicken), die Suche darunter findet jeden Empfänger. ✎ öffnet eine Serie:
+weitere Zahlungen dazunehmen und <b>Eingänge zuordnen</b> – bekommst du für ein Abo regelmäßig Geld zurück,
+hakst du die Absender an – die Überweisungen werden ab dann automatisch verrechnet und nur dein Anteil zählt.</td></tr>
+<tr><td>Partner</td><td>Ausgaben je Empfänger, ab drei Zahlungen.</td></tr>
+<tr><td>Durchgehen</td><td>Offene Zahlungen, eine nach der anderen. Tasten <b>1–9</b> wählen die Kategorie, <b>0</b> überspringt.</td></tr>
+<tr><td>Alle Zahlungen</td><td>Liste mit Filtern und Summe. Kategorie ändern, Regel anlegen, ÷ aufteilen, ✕ aus der Auswertung nehmen,
+Kommentar. <b>Rückzahlung</b> an einer eingehenden Zahlung: mit der Ausgabe verrechnen, zu der das Geld gehört.</td></tr>
+{% if 'paypal' in enabled %}<tr><td>PayPal</td><td>Nur die PayPal-Zahlungen.</td></tr>{% endif %}
+{% if 'card' in enabled %}<tr><td>Kreditkarte</td><td>Nur die Kartenpositionen.</td></tr>{% endif %}
+{% if 'splitwise' in enabled %}<tr><td>Splitwise</td><td>Saldo je Gruppe zum Abgleich mit der App, alle Positionen, eigene Auslagen
+verknüpfen. Gruppen mit Saldo 0 lassen sich schließen.</td></tr>{% endif %}
+<tr><td>Kategorien</td><td>Frei änderbar, eine Ebene Unterkategorien. Löschen gibt die Zahlungen zurück ins Durchgehen.</td></tr>
+<tr><td>Regeln</td><td>Muster → Kategorie. Ein Muster ist ein Teil von Empfänger oder Verwendungszweck, Groß/Klein egal. Rückwirkend anwendbar.
+Die fest eingebaute Automatik steht darunter und lässt sich abschalten.</td></tr>
+<tr><td>Import</td><td>Upload, Ergebnis des letzten Imports, Historie.</td></tr>
+<tr><td>Sicherung</td><td>Datenbank sichern, zurückspielen, auf einen anderen Rechner mitnehmen. Nur auf Knopfdruck.</td></tr>
+<tr><td>Einstellungen</td><td>Quellen, Stichtag, Einkommen, Fixkosten, Farbschema.</td></tr>
+</table>
+</div>
+
+<div class="card" id="exporte">
+<h2>Exporte</h2>
+<table>
+<tr><td>Bankkonto</td><td>Online-Banking → Umsätze → Export als CSV (nicht PDF). Erkannt werden die üblichen Spalten auf Deutsch und Englisch.</td></tr>
+{% if 'card' in enabled %}<tr><td>Kreditkarte</td><td>Das Kartenkonto separat exportieren. George wird erkannt; bei anderen Banken beim Import „Kreditkarte“ als Format wählen.</td></tr>{% endif %}
+{% if 'paypal' in enabled %}<tr><td>PayPal</td><td>paypal.com → Aktivitäten → Herunterladen → CSV.</td></tr>{% endif %}
+{% if 'splitwise' in enabled %}<tr><td>Splitwise</td><td>Gruppe → Einstellungen → „Als Tabelle exportieren“. Der Dateiname vor dem Datum ist der Gruppenname.</td></tr>{% endif %}
+<tr><td>Depot (Flatex)</td><td>Depotumsätze → Export als XLSX oder CSV. Landet unter Investitionen, nicht in den Zahlungen.</td></tr>
+</table>
+</div>
+
+<div class="card" id="auto">
+<h2>Was automatisch passiert</h2>
+<p class="mute">Nach jedem Import, in dieser Reihenfolge. Nichts davon ist endgültig – jede Zuordnung lässt sich ändern.</p>
+<ul>
+<li><b>Doppeltes</b> wird übersprungen; Buchungen vor dem Stichtag entfernt.</li>
+{% if 'paypal' in enabled %}<li><b>PayPal:</b> die Kontoabbuchung wird mit der echten PayPal-Zahlung verrechnet – gezählt wird der Händler.</li>{% endif %}
+{% if 'card' in enabled %}<li><b>Kreditkarte:</b> die Sammelabbuchung wird mit den Kartenposten verrechnet, die bis zum Abrechnungsstichtag genau dazu passen.</li>{% endif %}
+<li><b>Regeln</b> setzen Kategorien; danach die eingebaute Automatik (Auslandszahlung → Urlaub, Splitwise-Stichwörter).</li>
+<li><b>Fixkosten</b> mit Anteil werden auf deinen Prozentsatz gekürzt.</li>
+{% if 'splitwise' in enabled %}<li><b>Splitwise:</b> hat jemand anderes bezahlt, zählt dein Anteil. Hast du bezahlt, wird die Kontobuchung auf deinen Anteil gekürzt
+(centgenau, ±3 Tage, Karte ±7); sonst wird der Anteil mit Bargeld-Abhebungen oder als Gutschrift verrechnet. Ausgleichszahlungen zählen nicht.</li>{% endif %}
+<li><b>Rückzahlungs-Regeln</b> verrechnen Eingänge, die du unter Laufende Kosten zugeordnet hast, mit der passenden Abbuchung.</li>
+<li><b>Laufende Kosten</b> werden aus regelmäßigen Zahlungen erkannt (monatlich oder quartalsweise, ab drei Zahlungen). Was du von Hand
+aufnimmst oder ausblendest, hat Vorrang.</li>
+</ul>
+</div>
+
+<div class="card" id="einstellungen">
+<h2>Einstellungen</h2>
+<table>
+<tr><td>Quellen</td><td>Was du nutzt. Nicht angehakte Quellen verschwinden aus Menü und Import.</td></tr>
+<tr><td>Auswertung ab</td><td>Buchungen davor werden beim Import entfernt.</td></tr>
+<tr><td>Einkommen</td><td>Woran die App dein Gehalt erkennt – eine normale Regel.</td></tr>
+<tr><td>Fixkosten-Kategorien</td><td>Welche Kategorien im Diagramm als Fixkosten laufen und welche unter Laufende Kosten erscheinen dürfen.</td></tr>
+<tr><td>Geteilte Fixkosten</td><td>Muster, Kategorie, dein Anteil. Nötig, wenn du z. B. die Miete komplett überweist und die Hälfte zurückbekommst:
+die Kontobuchung zählt dann nur zur Hälfte, ohne dass du etwas verknüpfen musst{% if 'splitwise' in enabled %} – und die Splitwise-Position dazu wird nicht doppelt gezählt{% endif %}.</td></tr>
+<tr><td>Farbschema</td><td>Hell, dunkel und weitere, auch unten in der Seitenleiste umschaltbar.</td></tr>
+</table>
+</div>
+
+<div class="card" id="probleme">
+<h2>Probleme</h2>
+<table>
+<tr><td>Format nicht erkannt</td><td>Im Import-Ergebnis „Spalten zuordnen“: Datum, Betrag (oder Soll/Haben), Empfänger wählen – gilt danach für jede Datei
+mit dieser Kopfzeile (Einstellungen → Datenquellen zeigt die gemerkten Zuordnungen). PDF geht nicht, nur CSV oder XLSX.</td></tr>
+<tr><td>Zahl stimmt nicht</td><td>Auf die Zahl klicken – die Liste dahinter zeigt jede Buchung. Dort Kategorie, Aufteilung oder „zählt nicht“ ändern.</td></tr>
+<tr><td>Etwas zählt doppelt</td><td>Meist fehlt ein Export (PayPal, Karte) oder eine Verknüpfung. Die Hinweise im Dashboard sagen, was fehlt.</td></tr>
+<tr><td>Abo falsch in Laufende Kosten</td><td>✕ an der Zeile blendet es aus; „Vorschläge“ und die Suche dort nehmen Fehlendes auf; ✎ legt zwei Gruppen zusammen.</td></tr>
+<tr><td>Alles zurück</td><td>Unter Sicherung einen früheren Stand zurückspielen – vor jedem Zurückspielen wird der aktuelle Stand gesichert.</td></tr>
+</table>
+</div>
+</div>
+{% endblock %}

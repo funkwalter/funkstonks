@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% import "_cat_options.html" as catopt %}
+{% block content %}
+<h1>{{title or "Transaktionen"}}</h1>
+<form method="get" class="filters">
+{# Pass the period (from/to) and the other filters through so that changing
+   the category does not discard the chosen range. If a single month is
+   selected it wins - the route is built the same way. #}
+{% if f['from'] and not f.month %}<input type="hidden" name="from" value="{{f['from']}}">
+<input type="hidden" name="to" value="{{f['to']}}">{% endif %}
+{% if f.year %}<input type="hidden" name="year" value="{{f.year}}">{% endif %}
+{% if f.kind %}<input type="hidden" name="kind" value="{{f.kind}}">{% endif %}
+<select name="month" class="autosubmit">
+<option value="">{{ period_text if period|length > 1 else "Alle Monate" }}</option>
+{% for m in months %}<option value="{{m}}" {{'selected' if m==f.month}}>{{m}}</option>{% endfor %}</select>
+<select name="cat" class="autosubmit">
+<option value="">{{ "mehrere Kategorien" if cat_multi else "Alle Kategorien" }}</option>
+<option value="none" {{'selected' if f.cat=='none'}}>— unkategorisiert —</option>
+{% for c in cats %}<option value="{{c.id}}" {{'selected' if f.cat==c.id|string}}>{{c.name}}</option>{% endfor %}</select>
+{% if not locked_src %}<select name="src" class="autosubmit"><option value="">Alle Quellen</option>
+{% for s, lab in [('bank','Konto'),('paypal','PayPal'),('card','Kreditkarte'),('splitwise','Splitwise')] if s == 'bank' or s in nav_sources %}<option value="{{s}}" {{'selected' if f.src==s}}>{{lab}}</option>{% endfor %}</select>{% endif %}
+<select name="status" class="autosubmit"><option value="">Alle Status</option>
+<option value="active" {{'selected' if f.status=='active'}}>zählt</option>
+<option value="excluded" {{'selected' if f.status=='excluded'}}>zählt nicht</option>
+{% if 'splitwise' in nav_sources %}<option value="info" {{'selected' if f.status=='info'}}>Splitwise-Rohdaten</option>{% endif %}
+</select>
+<input type="search" name="q" value="{{f.q}}" placeholder="Suche Partner/Text" class="autosubmit-typing">
+<button>Filtern</button>
+{% if period|length > 1 %}<a class="mute" href="/transactions"
+  title="Zeitraum aufheben">Zeitraum {{period_text}} ×</a>{% endif %}
+</form>
+<div class="card p-0"><table>
+<tr><th>Datum</th><th>Quelle</th><th>Partner / Beschreibung</th>
+<th class="num">Betrag</th><th class="num">Effektiv</th><th>Kategorie</th><th></th></tr>
+{% for t in txs %}<tr class="{{'dim' if t.status in ('excluded','matched')}}">
+<td class="num">{{t.booking_date}}</td>
+<td><span class="pill">{{t.source}}</span></td>
+<td><b>{{t.partner}}</b><br><span class="mute">{{t.description[:110]}}
+{% if t.note %}<br><i>{{t.note}}</i>{% endif %}</span>
+<div class="tx-comment mt-2 fs-11" data-tx-id="{{t.id}}">
+<span class="tx-comment-view" style="{{'' if t.comment else 'display:none'}}">
+<i class="mute">{{t.comment}}</i> <a href="#" class="tx-comment-edit-link">bearbeiten</a></span>
+<a href="#" class="tx-comment-add-link mute" style="{{'display:none' if t.comment}}">+ Kommentar</a>
+<span class="tx-comment-form hide">
+<input type="text" class="tx-comment-input w-200 fs-12" value="{{t.comment or ''}}" placeholder="Kommentar...">
+<button type="button" class="ghost tx-comment-save fs-11">speichern</button>
+</span>
+</div>
+</td>
+<td class="num {{'neg' if t.amount<0 else 'pos'}}">{{'%.2f'|format(t.amount)}}</td>
+<td class="num">{% if t.effective_amount is not none %}<b>{{'%.2f'|format(t.effective_amount)}}</b>{% endif %}</td>
+{% if t.id in split_ids %}
+<td><a href="/tx/{{t.id}}/split?back=/transactions" class="mute" title="Aufgeteilt - Details/Anpassen">
+÷ aufgeteilt{% if t.id in split_share %}, davon
+{{'%.2f'|format(split_share[t.id])}} € hier{% endif %}</a></td>
+{% else %}
+<td><form method="post" action="/tx/{{t.id}}/update" class="inline">
+<select name="category_id" class="tx-cat" data-tx-id="{{t.id}}" data-rule="{{rule_hint.get(t.id, '')}}">
+<option value="">—</option>
+{{ catopt.options(cat_groups, t.category_id, cat_by_id) }}
+</select>
+<input type="hidden" name="rule_pattern" value="">
+<label class="mute" title="Regel anlegen: Muster wird abgefragt, gilt für die gewählte Kategorie">
+<input type="checkbox" name="make_rule" value="1"> <span class="rule-label">Regel</span></label>
+</form></td>
+{% endif %}
+<td class="nowrap">{% if t.id in repaid_ids %}
+<a class="btn ghost" href="/tx/{{t.id}}/repay?back={{ request.full_path|urlencode }}"
+title="Diese Gutschrift ist mit einer Ausgabe verrechnet – bearbeiten oder aufheben">Rückzahlung ✓</a>
+{% else %}{% if t.source in ('bank','paypal','card') and t.amount > 0 and t.status == 'active' and t.id not in split_ids %}
+<a class="btn ghost tx-repay" href="/tx/{{t.id}}/repay?back={{ request.full_path|urlencode }}"
+aria-label="Als Rückzahlung mit einer Ausgabe verrechnen"
+title="Geld, das zu einer Ausgabe gehört (Anteil eines Freundes, Erstattung): mit der Ausgabe verrechnen">Rückzahlung</a>
+{% endif %}<a class="btn ghost" href="/tx/{{t.id}}/split?back=/transactions"
+title="Auf mehrere Kategorien aufteilen">÷</a>
+<form method="post" action="/tx/{{t.id}}/update" class="inline">
+<button type="button" class="ghost tx-toggle" data-tx-id="{{t.id}}"
+data-excluded="{{ '1' if t.status=='excluded' else '' }}"
+title="Aus Auswertung ausschließen / aufnehmen">{{ '↩' if t.status=='excluded' else '✕' }}</button>
+</form>{% endif %}</td>
+</tr>{% endfor %}
+{% if txs %}{% set ns = namespace(sum=0.0, n=0) %}
+{% for t in txs if t.status == 'active' and not (t.category_id and cat_by_id.get(t.category_id) and cat_by_id[t.category_id].kind == 'transfer') %}{% set ns.sum = ns.sum + (split_share[t.id] if t.id in split_share else (t.effective_amount if t.effective_amount is not none else t.amount)) %}{% set ns.n = ns.n + 1 %}{% endfor %}
+<tr><td colspan="3"><b>Summe</b> <span class="mute">({{ns.n}} zählende Zeilen, effektiv, ohne Transfers)</span></td>
+<td class="num"></td><td class="num {{'neg' if ns.sum < 0 else 'pos'}}"><b>{{'%.2f'|format(ns.sum)}}</b></td>
+<td colspan="2"></td></tr>{% endif %}
+</table></div>
+<div class="mute">{% if txs|length >= tx_limit %}<b class="neg">Nur die {{tx_limit}} neuesten Zeilen –
+grenze den Zeitraum ein, sonst fehlt unten etwas.</b>{% elif txs|length == 0 %}Keine Treffer –
+<a href="/transactions">Filter zurücksetzen</a>.{% else %}{{txs|length}} Zeilen.{% endif %}
+✕ = aus Auswertung ausschließen (z.B. Umbuchungen) · „Rückzahlung“ an einer eingehenden Zahlung = mit
+der Ausgabe verrechnen, zu der das Geld gehört.</div>
+<script src="{{ url_for('static', filename='js/transactions.js') }}"></script>
+{% endblock %}

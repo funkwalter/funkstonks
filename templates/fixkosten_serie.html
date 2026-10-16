@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Serie: {{s.partner}}</h1>
+<p class="mute mt-0">{{s.interval}}, zuletzt {{s.last_date}} mit {{'%.2f'|format(s.full_amount)}} €, {{s.n}} Zahlungen
+{% if s.rule %}· Regel „{{s.rule}}“{% endif %}{% if s.forced %}· von Hand aufgenommen{% endif %}.
+<a href="/transactions?q={{term|urlencode}}">Alle Zahlungen</a> · <a href="/fixkosten">Zurück zu Laufende Kosten</a></p>
+
+<div class="card">
+<h2 class="mt-0">Eingänge zuordnen</h2>
+<form method="post">
+<input type="hidden" name="key" value="{{s.key}}">
+{% if rows %}
+<table><tr><th></th><th>Absender</th><th class="num">Überweisungen</th><th class="num">typisch</th><th class="num">zuletzt</th><th class="num">zugeordnet</th></tr>
+{% for g in rows %}<tr class="eing-row" data-partner="{{g.partner}}">
+<td><input type="checkbox" name="partners" value="{{g.partner}}" id="p{{loop.index}}" {{'checked' if g.active}}></td>
+<td><label for="p{{loop.index}}">{{g.partner}}</label>{% if g.rule and g.rule|lower != g.partner|lower %} <span class="mute fs-11"
+ title="Die Überweisungen enthalten das Muster dieser Regel – mehrere Absender können an derselben Regel hängen">über Regel „{{g.rule}}“</span>{% endif %}</td>
+<td class="num">{{g.n}}</td>
+<td class="num pos">{{'%.2f'|format(g.typical)}} €</td>
+<td class="num">{{g.last}}</td>
+<td class="num">{% if g.linked %}<span class="pill">{{g.linked}}×</span>{% endif %}</td>
+</tr>{% endfor %}
+</table>
+<div class="mt-12 flex gap-12 items-center wrap">
+<button title="Verrechnet gegen Abbuchungen mit „{{term}}“ (bis 45 Tage davor, 7 danach); die Regel steht dann auch unter Regeln">Speichern und verrechnen</button>
+</div>
+{% else %}<div class="mute">Keine eingehenden Zahlungen gefunden.</div>{% endif %}
+</form>
+</div>
+
+<div class="card">
+<h2 class="mt-0">Zahlungen dazunehmen</h2>
+{% if merged %}
+<table class="mb-10"><tr><th>Dazugenommen</th><th></th></tr>
+{% for mrow in merged %}<tr class="merged-row" data-key="{{mrow.key}}"><td>{{mrow.label or mrow.key}}</td>
+<td class="num"><form method="post" action="/fixkosten/override" class="inline">
+<input type="hidden" name="key" value="{{mrow.key}}"><input type="hidden" name="label" value="{{mrow.label}}"><input type="hidden" name="mode" value="clear">
+<input type="hidden" name="back" value="/fixkosten/serie?key={{s.key|urlencode}}">
+<button class="ghost fs-11 p-2-7">wieder trennen</button></form></td></tr>{% endfor %}
+</table>
+{% endif %}
+{% set cands = candidates|rejectattr('key', 'equalto', s.key)|list %}
+{% if cands or others %}
+<details class="inline-details" {{'open' if not merged}}>
+<summary class="mute">Empfänger auswählen ({{cands|length + others|length}})</summary>
+<input type="search" id="merge-filter" placeholder="Empfänger filtern …" aria-label="Empfänger filtern" class="m-6-0 minw-260">
+<table id="merge-table" class="mt-6"><tr><th>Empfänger</th><th>Kategorie</th><th class="num">Zahlungen</th><th class="num">zuletzt</th><th></th></tr>
+{% for g in cands %}<tr class="merge-row" data-key="{{g.key}}">
+<td><a href="/transactions?q={{g.partner|urlencode}}" class="series-link">{{g.partner[:44]}}</a></td>
+<td>{{g.cat_name}}</td><td class="num">{{g.n}}</td>
+<td class="num">{{g.last_date}} <span class="mute">({{'%.2f'|format(g.last_amount)}} €)</span></td>
+<td class="num"><form method="post" action="/fixkosten/override" class="inline">
+<input type="hidden" name="key" value="{{g.key}}"><input type="hidden" name="label" value="{{g.partner[:60]}}">
+<input type="hidden" name="mode" value="merge"><input type="hidden" name="target" value="{{s.key}}">
+<input type="hidden" name="back" value="/fixkosten/serie?key={{s.key|urlencode}}">
+<button class="ghost fs-11 p-2-7">dazunehmen</button></form></td>
+</tr>{% endfor %}
+{% for o in others %}<tr class="merge-row" data-key="{{o.key}}">
+<td><a href="/transactions?q={{(o.rule or o.partner)|urlencode}}" class="series-link">{{o.partner[:44]}}</a> <span class="pill">Serie</span></td>
+<td>{{o.cat_name}}</td><td class="num">{{o.n}}</td>
+<td class="num">{{o.last_date}} <span class="mute">({{'%.2f'|format(o.last_amount)}} €)</span></td>
+<td class="num"><form method="post" action="/fixkosten/override" class="inline" data-confirm="„{{o.partner[:40]}}“ mit „{{s.partner[:40]}}“ zusammenlegen? Die eigene Zeile verschwindet.">
+<input type="hidden" name="key" value="{{o.key}}"><input type="hidden" name="label" value="{{o.partner[:60]}}">
+<input type="hidden" name="mode" value="merge"><input type="hidden" name="target" value="{{s.key}}">
+<input type="hidden" name="back" value="/fixkosten/serie?key={{s.key|urlencode}}">
+<button class="ghost fs-11 p-2-7">dazunehmen</button></form></td>
+</tr>{% endfor %}
+</table>
+</details>
+<script src="{{ url_for('static', filename='js/fixkosten_serie.js') }}"></script>
+{% else %}<div class="mute">Keine weiteren Empfänger mit mindestens zwei Zahlungen.</div>{% endif %}
+</div>
+
+<div class="card"><h2 class="mt-0">Abbuchungen dieser Serie</h2>
+<table><tr><th>Datum</th><th>Empfänger</th><th class="num">Betrag</th><th class="num">zählt</th><th></th></tr>
+{% for p in payments %}<tr class="pay-row" data-id="{{p.id}}"><td class="num">{{p.booking_date}}</td><td>{{p.partner}}</td>
+<td class="num neg">{{'%.2f'|format(p.amount)}} €</td>
+<td class="num">{{'%.2f'|format(p.effective_amount if p.effective_amount is not none else p.amount)}} €</td>
+<td class="num"><form method="post" action="/fixkosten/serie/skip" class="inline">
+<input type="hidden" name="key" value="{{s.key}}"><input type="hidden" name="tx" value="{{p.id}}">
+<button class="ghost fs-11 p-2-7" title="Diese Zahlung aus der Serie nehmen" aria-label="Zahlung vom {{p.booking_date}} aus der Serie nehmen">✕</button></form></td></tr>{% endfor %}
+</table>
+{% if skipped %}
+<h3 class="m-12-0-4">Aus der Serie genommen</h3>
+<table><tr><th>Datum</th><th>Empfänger</th><th class="num">Betrag</th><th></th></tr>
+{% for p in skipped %}<tr class="skip-row mute" data-id="{{p.id}}"><td class="num">{{p.booking_date}}</td><td>{{p.partner}}</td>
+<td class="num">{{'%.2f'|format(p.amount)}} €</td>
+<td class="num"><form method="post" action="/fixkosten/serie/skip" class="inline">
+<input type="hidden" name="key" value="{{s.key}}"><input type="hidden" name="tx" value="{{p.id}}"><input type="hidden" name="undo" value="1">
+<button class="ghost fs-11 p-2-7">wieder aufnehmen</button></form></td></tr>{% endfor %}
+</table>
+{% endif %}
+<div class="mt-10">
+<form method="post" action="/fixkosten/override" class="inline"
+ {% if mode != 'hide' %}data-confirm="„{{s.partner[:40]}}“ aus den laufenden Kosten ausblenden?"{% endif %}>
+<input type="hidden" name="key" value="{{s.key}}"><input type="hidden" name="label" value="{{s.partner[:60]}}">
+{% if s.forced %}<input type="hidden" name="mode" value="clear"><button class="ghost">Von-Hand-Aufnahme zurücknehmen</button>
+{% else %}<input type="hidden" name="mode" value="hide"><button class="ghost">Aus den laufenden Kosten ausblenden</button>{% endif %}
+</form>
+</div></div>
+{% endblock %}
