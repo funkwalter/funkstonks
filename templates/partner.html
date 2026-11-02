@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% import "_cat_options.html" as catopt %}
+{% block content %}
+<h1>Partner-Übersicht</h1>
+
+{% set current = partners|selectattr('name','equalto',sel)|first if sel else None %}
+{% if current %}
+<div class="card">
+<div class="flex between items-baseline">
+<h2 class="m-0">{{current.name}}</h2>
+<div>
+<a class="btn ghost" href="/transactions?q={{current.name|urlencode}}">Alle Zahlungen →</a>
+<a class="btn ghost" href="/partner">← zurück zur Liste</a>
+</div>
+</div>
+<p class="mute">{{current.n}} Buchungen · {{current.first}} → {{current.last}} ·
+Gesamt <b>{{'%.2f'|format(current.total)}} €</b></p>
+<table>
+<tr><th>Jahr</th><th class="num">Summe</th></tr>
+{% for y, v in current.by_year.items() %}
+<tr><td>{{y}}</td><td class="num">{{'%.2f'|format(v)}} €</td></tr>
+{% endfor %}
+</table>
+<table class="mt-14">
+<tr><th>Monat</th><th class="num">Summe</th></tr>
+{% for mo, v in current.by_month.items()|reverse %}
+<tr><td>{{mo}}</td><td class="num">{{'%.2f'|format(v)}} €</td></tr>
+{% endfor %}
+</table>
+<h3>Einzelne Zahlungen</h3>
+<table>
+<tr><th>Datum</th><th class="num">Betrag</th><th>Kategorie</th></tr>
+{% for t in current.txs %}
+<tr>
+<td>{{t.booking_date}}</td>
+<td class="num {{'neg' if (t.effective_amount if t.effective_amount is not none else t.amount)<0 else 'pos'}}">
+{{'%.2f'|format(t.effective_amount if t.effective_amount is not none else t.amount)}}</td>
+<td><form method="post" action="/tx/{{t.id}}/update" class="inline">
+<select name="category_id" class="tx-cat" data-tx-id="{{t.id}}">
+<option value="">—</option>
+{{ catopt.options(cat_groups, t.category_id, cat_by_id) }}
+</select>
+</form></td>
+</tr>
+{% endfor %}
+</table>
+</div>
+{% else %}
+<div class="card p-0"><table>
+<tr><th>Partner</th><th class="num">Buchungen</th><th class="num">Gesamt</th><th>Kategorie</th><th>Zeitraum</th><th></th></tr>
+{% for p in partners %}
+<tr>
+<td>{{p.name}}</td>
+<td class="num">{{p.n}}</td>
+<td class="num"><b class="{{'neg' if p.total<0 else 'pos'}}">{{'%.2f'|format(p.total)}} €</b></td>
+<td><i class="chip" style="background:{{p.cat_color}}"></i>{{p.cat_name}}{% if p.mixed %} <span class="mute">u.a.</span>{% endif %}</td>
+<td>{{p.first}} → {{p.last}}</td>
+<td class="nowrap">
+<a class="btn ghost" href="/partner?p={{p.name|urlencode}}">Details</a>
+<a class="btn ghost" href="/transactions?q={{p.key|urlencode}}" title="Alle Zahlungen dieses Partners (alle Schreibweisen/Filialen)">Zahlungen</a>
+</td>
+</tr>
+{% endfor %}
+{% if not partners %}<tr><td colspan="6" class="mute">Noch keine Partner mit mindestens 3 Buchungen.</td></tr>{% endif %}
+</table></div>
+{% endif %}
+<script src="{{ url_for('static', filename='js/partner.js') }}"></script>
+{% endblock %}

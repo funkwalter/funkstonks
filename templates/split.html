@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% import "_cat_options.html" as catopt %}
+{% block content %}
+<h1>Zahlung aufteilen</h1>
+<div class="card maxw-640">
+<div class="flex between">
+<div><b>{{tx.partner}}</b><br><span class="mute">{{tx.booking_date}} · {{tx.description[:80]}}</span></div>
+<div class="num {{'neg' if tx.amount<0 else 'pos'}} fs-22 bold">
+{{'%.2f'|format(tx.amount)}} €</div>
+</div>
+{% if prop %}<p class="mute mt-10">Vorschlag aus Splitwise
+(Gruppe „{{prop.group}}", Einträge {{prop.since}} → {{prop.date}}) – anpassbar:</p>{% endif %}
+<form method="post" class="mt-10">
+<input type="hidden" name="back" value="{{back}}">
+<table id="rows">
+<tr><th>Kategorie</th><th class="num">Betrag</th><th></th></tr>
+{% set rows = rows if rows else (existing if existing else (prop.rows if prop else [])) %}
+{% for r in rows %}
+<tr><td><select name="cat">{{ catopt.options(cat_groups, r.category_id, cat_by_id) }}</select></td>
+<td class="num"><input type="text" name="amt" value="{{'%.2f'|format(r.amount)}}" class="w-100 ta-r"></td>
+<td><button type="button" class="ghost row-remove">–</button></td></tr>
+{% endfor %}
+{% if not rows %}
+<tr><td><select name="cat">{{ catopt.options(cat_groups, none) }}</select></td>
+<td class="num"><input type="text" name="amt" value="{{'%.2f'|format(tx.amount)}}" class="w-100 ta-r"></td>
+<td><button type="button" class="ghost row-remove">–</button></td></tr>
+{% endif %}
+</table>
+<div class="mt-10 flex gap-10">
+<button type="button" class="ghost" id="split-add">+ Zeile</button>
+<span class="flex-1"></span>
+{% if existing %}<button name="unsplit" value="1" class="ghost" data-confirm="Aufteilung aufheben? Die Zahlung ist danach wieder unkategorisiert.">Aufteilung aufheben</button>{% endif %}
+<button id="split-save">Speichern</button>
+</div>
+<div class="mute mt-6"><span id="split-rest"></span></div>
+</form>
+</div>
+<script type="application/json" id="split-data">{{ {'groups': cat_groups_json, 'total': tx.amount}|tojson }}</script>
+<script src="{{ url_for('static', filename='js/split.js') }}"></script>
+{% endblock %}

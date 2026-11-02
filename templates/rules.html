@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% import "_cat_options.html" as catopt %}
+{% block content %}
+<h1>Regeln <a class="help-link" href="/hilfe#auto" title="Hilfe zu dieser Seite" aria-label="Hilfe zu dieser Seite">?</a></h1>
+<div class="card">
+<form method="post" class="filters">
+<input type="text" name="pattern" placeholder="z.B. BILLA, Netflix, Wiener Linien (Komma = mehrere Regeln auf einmal)" required class="minw-340">
+<select name="category_id">{{ catopt.options(cat_groups, none) }}</select>
+<button>Regel anlegen</button>
+</form>
+
+<form method="post" class="inline mt-8"><button class="ghost" name="apply" value="1">
+Regeln jetzt anwenden</button></form>
+</div>
+
+<div class="card">
+<h2 class="mt-0">Rückzahlungs-Regeln</h2>
+<form method="post" class="filters">
+<input type="hidden" name="repay_add" value="1">
+<input type="text" name="in_pattern" placeholder="Eingang, z.B. Spotify Anna" required
+ title="Teil von Empfänger oder Verwendungszweck der EINGEHENDEN Zahlung" class="minw-220">
+<span class="mute">→ Ausgabe</span>
+<input type="text" name="out_pattern" placeholder="Ausgabe, z.B. SPOTIFY" required
+ title="Teil von Empfänger oder Verwendungszweck der Ausgabe" class="minw-180">
+<input type="number" name="window_days" value="45" min="1" max="400" title="Tage, die die Ausgabe vor dem Eingang liegen darf" class="w-70"> Tage
+<button>Regel anlegen</button>
+</form>
+{% if repay_rules %}
+<table class="mt-8"><tr><th>Überweisung an dich enthält</th><th>wird abgezogen von Abbuchung mit</th><th class="num" title="Wie weit die Abbuchung vor der Überweisung liegen darf">Fenster</th><th class="num">bisher</th><th></th></tr>
+{% for r in repay_rules %}<tr class="repay-row" data-id="{{r.id}}">
+<td><code>{{r.in_pattern}}</code></td><td><code>{{r.out_pattern}}</code></td>
+<td class="num mute">{{r.window_days}} Tage</td>
+<td class="num mute" title="Eingehende Zahlungen, die über diese Regel verknüpft wurden">{{r.n}}×</td>
+<td class="nowrap"><form method="post" class="inline" data-confirm="Rückzahlungs-Regel „{{r.in_pattern}} → {{r.out_pattern}}“ löschen? Bestehende Verknüpfungen bleiben.">
+<button class="ghost" name="repay_delete" value="{{r.id}}">löschen</button></form></td>
+</tr>
+{% if r.example %}{% set e = r.example %}<tr class="repay-example"><td colspan="5" class="mute fs-12 pt-0">
+{% if r.senders|length > 1 %}trifft {{r.senders|length}} Absender: {{r.senders|join(', ')}} · {% endif %}zuletzt: {{e.in_date}} <b>{{e.in_partner}}</b> +{{'%.2f'|format(e.in_amount)}} € → abgezogen von {{e.out_date}} <b>{{e.out_partner}}</b>
+{{'%.2f'|format(-e.out_amount)}} €, die zählt jetzt mit {{'%.2f'|format(-e.out_eff)}} €</td></tr>{% endif %}
+{% endfor %}
+</table>
+<form method="post" class="inline mt-8"><button class="ghost" name="repay_apply" value="1"
+ title="Alle Rückzahlungs-Regeln jetzt auf die vorhandenen Zahlungen anwenden (läuft sonst bei jedem Import)">Rückzahlungs-Regeln jetzt anwenden</button></form>
+{% else %}<div class="mute">Noch keine Rückzahlungs-Regeln.</div>{% endif %}
+</div>
+
+{% if system_rules %}
+{% set active_auto = system_rules|rejectattr('disabled')|list %}
+{% set off_auto = system_rules|selectattr('disabled')|list %}
+<details class="card card-toggle bg-panel" data-persist="rules-auto">
+<summary><h2>Fest eingebaute Automatik <span class="pill">{{active_auto|length}}</span></h2></summary>
+<table><tr><th>Wenn</th><th>dann Kategorie</th><th>Hinweis</th><th></th></tr>
+{% for sr in active_auto %}<tr class="auto-row" data-key="{{sr.key}}">
+<td>{{sr.desc}}</td>
+<td class="nowrap"><i class="chip" style="background:{{sr.color}}"></i>{{sr.cat_name}}</td>
+<td class="mute">{{sr.note}}</td>
+<td><form method="post" class="inline" data-confirm="Diese Automatik abschalten? Schon zugeordnete Zahlungen bleiben, wie sie sind.">
+<button class="ghost fs-11 p-2-7" name="auto_delete" value="{{sr.key}}">löschen</button></form></td>
+</tr>{% endfor %}
+</table>
+{% if off_auto %}
+<h3 class="m-12-0-4">Abgeschaltet</h3>
+<table>{% for sr in off_auto %}<tr class="auto-row mute" data-key="{{sr.key}}">
+<td>{{sr.desc}}</td><td class="nowrap"><i class="chip" style="background:{{sr.color}}"></i>{{sr.cat_name}}</td>
+<td><form method="post" class="inline"><button class="ghost fs-11 p-2-7" name="auto_restore" value="{{sr.key}}">wieder einschalten</button></form></td>
+</tr>{% endfor %}</table>
+{% endif %}
+</details>
+{% endif %}
+
+{% if not grouped %}
+<div class="card mute">Noch keine Regeln.</div>
+{% else %}
+<details class="card card-toggle" data-persist="rules-list" open>
+<summary><h2>Bestehende Regeln <span class="pill">{{grouped.values()|map(attribute='n')|sum}}</span></h2></summary>
+{% endif %}
+{% macro ruletable(rules) %}
+<table><tr><th>Muster</th><th></th></tr>
+{% for r in rules %}<tr class="rule-row" data-rule-id="{{r.id}}">
+<td class="rule-view"><code>{{r.pattern}}</code>
+{% set h = hits[r.id] %}
+{% if h.n %}<span class="mute" title="Zahlungen, auf die dieses Muster zutrifft{% if h.off %} – {{h.off}} davon stehen aktuell in einer anderen Kategorie{% endif %}">({{h.n}}×{% if h.off %}, <b>{{h.off}} abweichend</b>{% endif %})</span>
+{% else %}<span class="mute" title="Kein Treffer in den aktuellen Buchungen">(0×)</span>{% endif %}</td>
+<td class="rule-edit hide">
+<input type="text" class="rule-edit-pattern w-220" value="{{r.pattern}}">
+<select class="rule-edit-cat">{{ catopt.options(cat_groups, r.category_id, cat_by_id) }}</select>
+</td>
+<td class="nowrap">
+<span class="rule-view">
+<button type="button" class="ghost rule-edit-btn">ändern</button>
+<button type="button" class="ghost rule-apply-btn"
+title="Diese Regel auch auf bereits verbuchte Zahlungen anwenden">rückwirkend anwenden</button>
+<form method="post" class="inline rule-delete-form" data-confirm="Regel „{{r.pattern}}“ löschen?"><input type="hidden" name="ajax" value="1">
+<button class="ghost" name="delete" value="{{r.id}}">löschen</button></form>
+</span>
+<span class="rule-edit hide">
+<button type="button" class="ghost rule-save-btn">speichern</button>
+<button type="button" class="ghost rule-cancel-btn">abbrechen</button>
+</span>
+</td>
+</tr>{% endfor %}
+</table>
+{% endmacro %}
+
+{% for cat_name, g in grouped.items() %}
+<div class="card">
+<details>
+<summary class="pointer nolist flex items-center gap-8">
+<h2 class="m-0"><i class="chip" style="background:{{g.color}}"></i>{{cat_name}}</h2>
+<span class="pill">{{g.n}}</span>
+</summary>
+{% if g.own %}
+{% if g.subs %}<div class="mute m-6-0-2">Direkt auf „{{cat_name}}“ (ohne Unterkategorie)</div>{% endif %}
+{{ ruletable(g.own) }}
+{% endif %}
+{% for sub_name, s in g.subs.items() %}
+<div style="border-left:3px solid {{s.color}}" class="ml-10 pl-12 mt-12">
+<div class="flex items-center gap-8 mb-2">
+<b><i class="chip" style="background:{{s.color}}"></i>{{sub_name}}</b>
+<span class="pill">{{s.rules|length}}</span>
+</div>
+{{ ruletable(s.rules) }}
+</div>
+{% endfor %}
+</details>
+</div>
+{% endfor %}
+{% if grouped %}</details>{% endif %}
+<script src="{{ url_for('static', filename='js/rules.js') }}"></script>
+{% endblock %}

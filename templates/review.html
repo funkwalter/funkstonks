@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Durchgehen</h1>
+{% if not tx %}
+<div class="card ta-c p-40">
+<div class="fs-40">✓</div>
+<h2>Alles kategorisiert!</h2>
+<p class="mute">Jede Zahlung ist zugeordnet. Weiter zum <a href="/">Dashboard</a>.</p>
+</div>
+{% else %}
+{% if is_correction %}
+<p class="mute">Korrektur einer bereits durchgegangenen Zahlung.
+<a href="/review">← zurück zur Warteschlange ({{total}} offen)</a></p>
+{% else %}
+<p class="mute">Noch <b>{{total}}</b> Zahlungen offen.</p>
+{% endif %}
+
+<div class="card maxw-760 overflow-visible">
+<div class="flex between items-baseline wrap gap-8">
+<div>
+<div class="fs-19 bold">{{tx.partner or '—'}}</div>
+<div class="mute">{{tx.booking_date}} · {{tx.source}}{% if tx.note %} · {{tx.note}}{% endif %}</div>
+<div class="mute maxw-520">{{tx.description[:180]}}</div>
+</div>
+<div class="num {{'neg' if tx.amount<0 else 'pos'}} fs-26 bold">
+{{'%.2f'|format(tx.amount)}} €</div>
+</div>
+
+{% if prop %}
+<div class="warn mt-12">
+<b>Das ist eine Splitwise-Ausgleichszahlung</b> (Gruppe „{{prop.group}}").
+Zusammensetzung laut Splitwise seit dem letzten Ausgleich:
+<table class="m-6-0">{% for p in prop.rows %}
+<tr><td>{{p.name}}</td><td class="num">{{'%.2f'|format(p.amount)}} €</td></tr>{% endfor %}</table>
+<form method="post" class="inline">
+<input type="hidden" name="tx_id" value="{{tx.id}}"><input type="hidden" name="o" value="{{offset}}">
+<input type="hidden" name="correction" value="{{'1' if is_correction else ''}}">
+<input type="hidden" name="apply_split" value='{{prop.rows|tojson}}'>
+<button>So aufteilen</button></form>
+<a class="btn ghost" href="/tx/{{tx.id}}/split?back=/review">Anpassen…</a>
+</div>
+{% endif %}
+{% if clearing_hint %}<div class="warn mt-10">{{clearing_hint}}
+<a href="{{ url_for('review') if is_correction else url_for('review', o=offset+1) }}">Überspringen →</a></div>{% endif %}
+<form method="post" class="mt-14">
+<input type="hidden" name="tx_id" value="{{tx.id}}">
+<input type="hidden" name="o" value="{{offset}}">
+<input type="hidden" name="correction" value="{{'1' if is_correction else ''}}">
+<div class="flex wrap gap-6">
+{% for g in cat_groups %}
+{% if g.label %}
+<span class="cat-parent-wrap relative inline-block">
+<button type="button" class="ghost cat-slot cat-parent-btn"
+ style="border-color:{{g.options[0].color}}">
+<i class="chip" style="background:{{g.options[0].color}}"></i>{{g.label}} ▾</button>
+<span class="cat-children">
+{% for c in g.options %}<button name="category_id" value="{{c.id}}" class="ghost cat-child"
+ style="border-color:{{c.color}}">
+<i class="chip" style="background:{{c.color}}"></i>{{c.name}}</button>{% endfor %}
+</span></span>
+{% else %}{% for c in g.options %}
+<button name="category_id" value="{{c.id}}" class="ghost cat-slot"
+ style="border-color:{{c.color}}">
+<i class="chip" style="background:{{c.color}}"></i>{{c.name}}</button>
+{% endfor %}{% endif %}
+{% endfor %}
+</div>
+<div class="mt-14 flex gap-16 items-center wrap">
+<label class="flex items-center gap-6">
+<input type="checkbox" name="make_rule" value="1">
+Regel merken für
+<input type="text" name="rule_pattern" value="{{rule_suggestion}}"
+ title="Anpassbar - z.B. ein einzelnes Schlagwort aus dem Verwendungszweck statt des vollen Partnernamens" class="w-170">
+immer so kategorisieren</label>
+<span class="flex-1"></span>
+{% if tx.amount > 0 and tx.source in ('bank','paypal','card') %}
+<a class="btn ghost" href="/tx/{{tx.id}}/repay?back=/review"
+ title="Geld, das du für eine Ausgabe zurückbekommst – die Ausgabe zählt dann nur noch mit dem Rest">Rückzahlung…</a>
+{% endif %}
+<a class="btn ghost" href="/tx/{{tx.id}}/split?back=/review">Aufteilen…</a>
+{% if is_correction %}
+<a class="btn ghost" href="/review">Zurück zur Warteschlange →</a>
+{% else %}
+<a class="btn ghost" href="/review?o={{offset+1}}">Überspringen →</a>
+{% endif %}
+<button name="exclude" value="1" class="ghost"
+ title="z.B. Umbuchung zwischen eigenen Konten">Zählt nicht</button>
+</div>
+</form>
+</div>
+<p class="mute flex gap-14 wrap items-center">
+<span title="Tastatur: 1–9 = Knöpfe, 0 oder → = weiter, ← = zurück zur letzten">⌨ 1–9 · 0/→ · ←</span>
+<a class="btn ghost" id="review-undo" href="#" hidden>← Letzte korrigieren</a></p>
+<script type="application/json" id="review-data">{{ {'id': tx.id, 'correction': is_correction|default(false), 'next': (url_for('review') if is_correction else url_for('review', o=offset+1))}|tojson }}</script>
+<script src="{{ url_for('static', filename='js/review.js') }}"></script>
+{% endif %}
+{% endblock %}

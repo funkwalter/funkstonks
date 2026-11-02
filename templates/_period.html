@@ -1,0 +1,45 @@
+{# Period picker for dashboard, investments and comparison: ONE dropdown with
+   years, recent months, single months and "custom period" - only that choice
+   reveals the from/to fields (user 2026-10-14: the permanent from-to was
+   "extrem schirch", i.e. very ugly). from/to are only sent when they are
+   visible (otherwise they would win over range on the server). NO inline
+   style with display on the span - it beat the hidden attribute and from/to
+   was always visible (bug 2026-10-14). quick='/path' prepends the quick
+   choice 1M/3M/6M/1J/Gesamt (quick_qs = the query part that is kept, ending
+   with '&'). name_prefix ('a_') and keep (list of (name, value) as hidden
+   fields) are needed by the comparison page with two periods on one page. #}
+{% macro period_picker(months, years, sel_range, first, last, id_prefix='pp', label='', quick='', quick_qs='', name_prefix='', keep=[], title='Zeitraum') %}
+{% if quick %}<span class="seg" role="group" aria-label="Schnellwahl {{title}}">
+{% for key, lab in (('last1','1M'),('last3','3M'),('last6','6M'),('last12','1J'),('all','Gesamt')) %}<a href="{{quick}}?{{quick_qs}}{{name_prefix}}range={{key}}" class="{{'on' if sel_range==key}}">{{lab}}</a>{% endfor %}
+</span>{% endif %}
+<form method="get" class="period-picker">
+{% for k, v in keep %}<input type="hidden" name="{{k}}" value="{{v}}">{% endfor %}
+<label class="mute" for="{{id_prefix}}-range">{{title}}</label>
+<select name="{{name_prefix}}range" id="{{id_prefix}}-range" class="pp-range">
+{% set known = ['all','last3','last6','last12'] + years|list + months|list %}
+{% if sel_range and sel_range not in known %}<option value="{{sel_range}}" selected>{{label or sel_range}}</option>{% endif %}
+<optgroup label="Ganzes Jahr">
+{% for y in years %}<option value="{{y}}" {{'selected' if sel_range==y}}>{{y}}</option>{% endfor %}
+<option value="all" {{'selected' if sel_range=='all'}}>alles zusammen</option>
+</optgroup>
+<optgroup label="Letzte Monate">
+<option value="last3" {{'selected' if sel_range=='last3'}}>letzte 3 Monate</option>
+<option value="last6" {{'selected' if sel_range=='last6'}}>letzte 6 Monate</option>
+<option value="last12" {{'selected' if sel_range=='last12'}}>letzte 12 Monate</option>
+</optgroup>
+<optgroup label="Einzelner Monat">
+{% for m in months %}<option value="{{m}}" {{'selected' if sel_range==m}}>{{m}}</option>{% endfor %}
+</optgroup>
+<optgroup label="Frei">
+<option value="custom" {{'selected' if not sel_range}}>Eigener Zeitraum …</option>
+</optgroup>
+</select>
+<span class="pp-custom"{% if sel_range %} hidden{% endif %}>
+<label class="mute" for="{{id_prefix}}-from">von</label>
+<select name="{{name_prefix}}from" id="{{id_prefix}}-from" {% if sel_range %}disabled{% endif %}>{% for m in months %}<option value="{{m}}" {{'selected' if m==first}}>{{m}}</option>{% endfor %}</select>
+<label class="mute" for="{{id_prefix}}-to">bis</label>
+<select name="{{name_prefix}}to" id="{{id_prefix}}-to" {% if sel_range %}disabled{% endif %}>{% for m in months %}<option value="{{m}}" {{'selected' if m==last}}>{{m}}</option>{% endfor %}</select>
+<button class="ghost">anzeigen</button>
+</span>
+</form>
+{% endmacro %}

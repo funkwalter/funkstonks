@@ -1,0 +1,30 @@
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [".venv", "Share", "build", "dist", "backups", "uploads"]
+
+[tool.ruff.lint]
+# E/W: pycodestyle, F: pyflakes, I: Import-Sortierung, B: bugbear (echte Fehlerquellen), UP: moderne Syntax
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+  "E501",   # Zeilenlaenge regelt der Formatter
+  "E731",   # lambda-Zuweisungen sind in den Auswertungen bewusst kurz
+  "B007",   # ungenutzte Schleifenvariablen in Tupel-Entpackungen
+  "B905",   # zip ohne strict - Python 3.10 kennt es, aber nicht noetig
+  "UP015",  # offene Modi explizit lassen
+  "UP031",  # %-Formatierung in Altcode - Umstellung nur von Hand, nicht automatisch
+  "E741",   # kurze Namen wie l in Einzeilern der Tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+"app.py" = ["F401", "E402"]          # Einstieg: reicht alle Namen durch, Modulklasse danach
+"tests/*" = ["F403", "F405", "E402", "B018", "F841"]  # from _import_common import * ist dort Absicht
+
+[tool.ruff.format]
+quote-style = "double"
+line-ending = "lf"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "-q -p no:cacheprovider"

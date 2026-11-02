@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block head %}<script src="{{ url_for('static', filename='echarts.min.js') }}"></script>
+<style>main{max-width:100%}</style>
+{% endblock %}
+{% from "_period.html" import period_picker %}
+{% block content %}
+{% set first = sel_months[0] if sel_months else '' %}
+{% set last = sel_months[-1] if sel_months else '' %}
+<div class="page-head">
+<h1>Investitionen</h1>
+<span class="mute">{{period}}{% if n_months > 1 %} · {{n_months}} Monate{% endif %}</span>
+</div>
+
+{% if not has_invest_cat %}<div class="warn">Es gibt keine Kategorie „Investitionen“ – ohne sie weiß die App nicht, welche
+Überweisungen als investiert gelten. Unter <a href="/categories">Kategorien</a> anlegen und die Depot-Überweisungen
+dorthin kategorisieren.</div>{% endif %}
+
+<div class="kpis">
+<div class="kpi"><span>Einnahmen</span>
+<a href="/transactions?{{period_qs}}&kind=income" class="nolink"><b class="pos">{{'%.2f'|format(tot.inc)}} €</b></a>
+{% if n_months > 1 %}<span class="mute">Ø {{'%.2f'|format(avg.inc)}} € / Monat</span>{% endif %}</div>
+<div class="kpi"><span>Ausgaben</span>
+<b class="neg">{{'%.2f'|format(tot.exp)}} €</b>
+<span class="mute">{% if tot.inc > 0.004 %}{{'%.1f'|format(100*tot.exp/tot.inc)}} % der Einnahmen{% endif %}{% if n_months > 1 %} · Ø {{'%.2f'|format(avg.exp)}} €{% endif %}</span></div>
+<div class="kpi kpi-invest"><span>Investiert</span>
+<a href="{% if invest_qs %}/transactions?{{period_qs}}&cat={{invest_qs}}{% else %}#depot{% endif %}" class="nolink"><b class="invest">{{'%.2f'|format(tot.invest)}} €</b></a>
+<span class="mute">{% if pct is not none %}{{'%.1f'|format(pct)}} % der Einnahmen (Sparquote){% endif %}{% if n_months > 1 %} · Ø {{'%.2f'|format(avg.invest)}} €{% endif %}</span></div>
+{% if depot.held %}<div class="kpi kpi-invest"><span>Depotwert</span>
+{% if depot.n %}<a href="#depot" class="nolink"><b class="invest">{{'%.2f'|format(depot.value)}} €</b></a>
+<span class="{{'pos' if depot.gain > 0.004 else ('neg' if depot.gain < -0.004 else 'mute')}}">{{'%+.2f'|format(depot.gain)}} €{% if depot.gain_pct is not none %} ({{'%+.1f'|format(depot.gain_pct)}} %){% endif %}</span>
+<span class="mute">{% if depot.n < depot.held %}{{depot.n}} von {{depot.held}} Positionen mit Kurs{% else %}Kurse vom {{depot.oldest}}{% endif %}</span>
+{% else %}<a href="#depot" class="nolink"><b class="mute">–</b></a><span class="mute">noch kein Kurs – unten „Kurse aktualisieren“</span>{% endif %}</div>{% endif %}
+<div class="kpi"><span>Saldo (übrig)</span>
+<a href="/transactions?{{period_qs}}" class="nolink"><b class="{{'pos' if tot.saldo>=0 else 'neg'}}">{{'%.2f'|format(tot.saldo)}} €</b></a>
+<span class="mute">{% if tot.inc > 0.004 %}{{'%.1f'|format(100*tot.saldo/tot.inc)}} % der Einnahmen{% endif %}{% if n_months > 1 %} · Ø {{'%.2f'|format(avg.saldo)}} €{% endif %}</span></div>
+</div>
+
+<div class="card">
+<div class="flex between items-center wrap gap-10">
+<h2 class="m-0">Verlauf – {{period}}</h2>
+<div class="chart-tools static">
+<span class="seg" role="group" aria-label="Ansicht">
+<button type="button" id="view-cash" class="on" title="Einnahmen, Ausgaben, Investiert und Saldo je Monat in Euro (Linien)">Cashflow</button><button type="button" id="view-share" title="Je Monat: Einnahmen = 100 % – wie viel davon ausgegeben, investiert, übrig">Anteile</button><button type="button" id="view-cum" title="Investiert und Saldo aufsummiert über die Monate">Kumuliert</button>
+</span>
+{{ period_picker(months, years, sel_range, first, last, "inv", period, quick="/investitionen") }}
+</div>
+</div>
+{% if rows %}<div id="invchart" class="h-420 mt-8"></div>
+{% else %}<div class="mute">Noch keine Buchungen im Zeitraum.</div>{% endif %}</div>
+
+<details class="card card-toggle" data-persist="inv-table" open>
+<summary><h2>Monat für Monat</h2></summary>
+<table class="fixedcols"><colgroup><col class="w-18p"><col class="w-14p"><col class="w-14p"><col class="w-14p"><col class="w-10p"><col class="w-14p"><col class="w-16p"></colgroup>
+<tr><th>Monat</th><th class="num">Einnahmen</th><th class="num">Ausgaben</th><th class="num">Investiert</th><th class="num" title="Anteil der Investitionen an den Einnahmen">Sparquote</th><th class="num">Saldo</th><th class="num">Investiert kumuliert</th></tr>
+{% set ns = namespace(cum=0.0) %}
+{% for r in rows %}{% set ns.cum = ns.cum + r.invest %}{% endfor %}
+{% set ns2 = namespace(cum=ns.cum) %}
+{% for r in rows|reverse %}<tr class="inv-row" data-month="{{r.month}}" data-inc="{{r.inc}}" data-exp="{{r.exp}}" data-invest="{{r.invest}}" data-saldo="{{r.saldo}}" data-cum="{{'%.2f'|format(ns2.cum)}}" data-partial="{{'1' if r.partial else '0'}}" data-depot="{{r.depot if r.depot is not none else ''}}" data-depotcost="{{r.depot_cost}}" data-depotcur="{{'1' if r.depot_cur else '0'}}">
+<td><a href="/investitionen?month={{r.month}}" class="ink-inherit nolink">{{r.label}}</a>{% if r.partial %} <span class="mute" title="Daten bis zur letzten Buchung – Monat unvollständig">*</span>{% endif %}</td>
+<td class="num pos"><a href="/transactions?month={{r.month}}&kind=income">{{'%.2f'|format(r.inc)}} €</a></td>
+<td class="num neg">{{'%.2f'|format(r.exp)}} €</td>
+<td class="num invest">{% if invest_qs %}<a href="/transactions?month={{r.month}}&cat={{invest_qs}}" class="invest">{{'%.2f'|format(r.invest)}} €</a>{% else %}{{'%.2f'|format(r.invest)}} €{% endif %}</td>
+<td class="num mute">{% if r.pct is not none %}{{'%.1f'|format(r.pct)}} %{% else %}–{% endif %}</td>
+<td class="num {{'pos' if r.saldo>=0 else 'neg'}}"><a href="/transactions?month={{r.month}}">{{'%.2f'|format(r.saldo)}} €</a></td>
+<td class="num invest">{{'%.2f'|format(ns2.cum)}} €</td>
+{% set ns2.cum = ns2.cum - r.invest %}
+</tr>{% endfor %}
+<tr><td><b>Summe</b></td><td class="num"><b>{{'%.2f'|format(tot.inc)}} €</b></td><td class="num"><b>{{'%.2f'|format(tot.exp)}} €</b></td>
+<td class="num"><b>{{'%.2f'|format(tot.invest)}} €</b></td><td class="num"><b>{% if pct is not none %}{{'%.1f'|format(pct)}} %{% else %}–{% endif %}</b></td>
+<td class="num"><b>{{'%.2f'|format(tot.saldo)}} €</b></td><td></td></tr>
+</table></details>
+
+<div class="card" id="depot">
+<div class="flex between items-center wrap gap-10">
+<h2 class="m-0">Depot</h2>
+{% if held %}<form method="post" action="/investitionen/kurse" class="inline">
+<button class="ghost" title="Holt die aktuellen Kurse deiner Positionen von Yahoo Finance – nur jetzt, nie von selbst">Kurse aktualisieren</button></form>{% endif %}
+</div>
+{% if positions %}
+<table class="fixedcols mt-8"><colgroup><col class="w-26p"><col class="w-13p"><col class="w-8p"><col class="w-12p"><col class="w-10p"><col class="w-10p"><col class="w-11p"><col class="w-10p"></colgroup>
+<tr><th>Position</th><th>ISIN</th><th class="num">Stück</th><th class="num">Investiert</th><th class="num">Ø Kaufkurs</th><th class="num">Kurs</th><th class="num">Wert</th><th class="num">Gewinn</th></tr>
+{% for p in positions %}<tr class="pos-row" data-isin="{{p.isin}}" data-qty="{{p.qty}}" data-invested="{{p.invested}}" data-value="{{p.value if p.value is not none else ''}}" data-gain="{{p.gain if p.gain is not none else ''}}">
+<td><b>{{p.name}}</b>{% if p.realized %}<br><span class="mute fs-11">realisiert {{'%+.2f'|format(p.realized)}} €</span>{% endif %}</td>
+<td class="mute">{{p.isin}}</td>
+<td class="num">{{ ('%.4f'|format(p.qty)).rstrip('0').rstrip('.') }}</td>
+<td class="num invest"><b>{{'%.2f'|format(p.invested)}} €</b></td>
+<td class="num">{% if p.avg_price %}{{'%.2f'|format(p.avg_price)}} €{% else %}–{% endif %}</td>
+<td class="num">{% if p.price is not none %}<span title="{{p.price_date}}{% if p.price_src == 'manual' %} · von Hand{% elif p.currency and p.currency != 'EUR' %} · {{'%.2f'|format(p.price_native)}} {{p.currency}}{% endif %}">{{'%.2f'|format(p.price)}} €</span>{% if p.price_src == 'manual' %} <span class="pill" title="Von Hand eingetragen – der nächste erfolgreiche Abruf ersetzt ihn">manuell</span>{% endif %}{% elif p.qty > 0 %}<span class="mute">–</span>{% endif %}</td>
+<td class="num">{% if p.value is not none %}<b>{{'%.2f'|format(p.value)}} €</b>{% endif %}</td>
+<td class="num {{'pos' if p.gain and p.gain > 0.004 else ('neg' if p.gain and p.gain < -0.004 else 'mute')}}">{% if p.gain is not none %}{{'%+.2f'|format(p.gain)}} €{% if p.gain_pct is not none %}<br><span class="fs-11">{{'%+.1f'|format(p.gain_pct)}} %</span>{% endif %}{% endif %}</td>
+</tr>{% endfor %}
+<tr><td><b>Summe</b></td><td></td><td></td><td class="num"><b>{{'%.2f'|format(depot_total)}} €</b></td><td></td><td></td>
+<td class="num">{% if depot.n %}<b>{{'%.2f'|format(depot.value)}} €</b>{% endif %}</td>
+<td class="num {{'pos' if depot.gain > 0.004 else ('neg' if depot.gain < -0.004 else 'mute')}}">{% if depot.n %}<b>{{'%+.2f'|format(depot.gain)}} €</b>{% endif %}</td></tr>
+</table>
+{% if held %}<form method="post" action="/investitionen/kurs" class="filters m-8-0-0">
+<select name="isin" aria-label="Position" required>{% for p in held %}<option value="{{p.isin}}">{{p.name[:40]}}</option>{% endfor %}</select>
+<input type="text" name="price" placeholder="Kurs in €" title="Kurs von Hand in Euro; 0 oder leer entfernt den gemerkten Kurs" required class="w-110">
+<input type="date" name="date" title="Handelstag (leer = heute)">
+<button class="ghost">Kurs setzen</button>
+</form>{% endif %}
+<h3 class="m-14-0-4"><button type="button" class="ghost tgl" data-key="depot" aria-expanded="false" aria-label="Depotumsätze auf- oder zuklappen"
+>▸</button>Depotumsätze ({{depot_rows|length}})</h3>
+<table><tr class="sub-depot" hidden><th>Datum</th><th>Art</th><th>Position</th><th class="num">Stück</th><th class="num">Kurs</th><th class="num">Betrag</th><th>Info</th></tr>
+{% for d in depot_rows %}<tr class="sub-depot" hidden>
+<td class="num">{{d.booking_date}}</td>
+<td><span class="pill">{{ {'buy':'Kauf','sell':'Verkauf'}.get(d.kind, d.kind) }}</span></td>
+<td>{{d.name}} <span class="mute">{{d.isin}}</span></td>
+<td class="num">{{ ('%.4f'|format(d.qty)).rstrip('0').rstrip('.') }}</td>
+<td class="num">{% if d.price %}{{'%.2f'|format(d.price)}} €{% endif %}</td>
+<td class="num {{'invest' if d.kind=='buy' else 'pos'}}">{{'%.2f'|format(d.amount)}} €</td>
+<td class="mute">{{(d.info or '')[:60]}}</td>
+</tr>{% endfor %}
+</table>
+{% else %}
+<p class="mute m-0">Noch keine Depotumsätze – Flatex-Export (XLSX oder CSV) unter <a href="/import">Import</a> hochladen.</p>
+{% endif %}
+</div>
+
+{% if rows %}
+<script src="{{ url_for('static', filename='js/investitionen.js') }}"></script>
+{% endif %}
+{% endblock %}

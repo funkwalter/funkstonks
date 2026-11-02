@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Sicherung <a class="help-link" href="/hilfe#probleme" title="Hilfe zu dieser Seite" aria-label="Hilfe zu dieser Seite">?</a></h1>
+
+<div class="card">
+<h2 class="mt-0">Datenbank sichern</h2>
+<form method="post" class="inline"><input type="hidden" name="action" value="backup">
+<button class="fs-15 p-8-18">Jetzt sichern</button>
+<span class="mute ml-10">legt <code>backups/moneyflow_JJJJMMTT_HHMMSS.db</code> an</span></form>
+</div>
+
+<div class="card">
+<h2 class="mt-0">Sicherungen</h2>
+{% if backups %}
+<table><tr><th>Zeitpunkt</th><th>Anlass</th><th class="num">Größe</th><th></th></tr>
+{% for b in backups %}<tr>
+<td>{{b.when}}</td><td class="mute">{{b.tag}}</td><td class="num">{{b.kb}} KB</td>
+<td class="nowrap">
+<form method="post" class="inline" data-confirm="Sicherung vom {{b.when}} zurückspielen? Alles, was seitdem importiert oder kategorisiert wurde, ist danach weg. Der jetzige Stand wird vorher als Sicherung „vor Wiederherstellung“ abgelegt.">
+<input type="hidden" name="action" value="restore"><input type="hidden" name="backup" value="{{b.name}}">
+<button class="ghost">zurückspielen</button></form>
+<a class="btn ghost" href="/sicherung/download/{{b.name}}" title="Als Datei speichern – z. B. für einen anderen Rechner">herunterladen</a>
+<form method="post" class="inline" data-confirm="Sicherung vom {{b.when}} endgültig löschen?">
+<input type="hidden" name="action" value="delete"><input type="hidden" name="backup" value="{{b.name}}">
+<button class="ghost">löschen</button></form>
+</td></tr>{% endfor %}
+</table>
+{% else %}<div class="mute">Noch keine Sicherung vorhanden.</div>{% endif %}
+<h3 class="m-16-0-4">Datenbank-Datei einspielen</h3>
+<form method="post" enctype="multipart/form-data" class="inline" data-confirm="Diese Datei einspielen? Der aktuelle Stand wird komplett ersetzt (vorher gesichert).">
+<input type="hidden" name="action" value="upload">
+<input type="file" name="dbfile" accept=".db,.sqlite,.sqlite3" required>
+<button class="ghost">einspielen</button></form>
+</div>
+
+<div class="card">
+<h2 class="mt-0">CSV-Export</h2>
+<a class="btn" href="/export.csv" title="Alle Buchungen als Tabelle, nur zum Anschauen – nicht wieder importierbar">CSV herunterladen</a>
+</div>
+{% endblock %}

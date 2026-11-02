@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_period.html" import period_picker %}
+{% block content %}
+<div class="page-head">
+<h1>Vergleich</h1>
+<div class="filters m-0 gap-18 col items-start">
+<div class="chart-tools static">{{ period_picker(months, years, a_range, a_months[0] if a_months else '', a_months[-1] if a_months else '', 'a', A.label, quick='/vergleich', quick_qs=a_qs, name_prefix='a_', keep=b_keep, title='A') }}</div>
+<div class="chart-tools static">{{ period_picker(months, years, b_range, b_months[0] if b_months else '', b_months[-1] if b_months else '', 'b', B.label, quick='/vergleich', quick_qs=b_qs, name_prefix='b_', keep=a_keep, title='B') }}</div>
+</div>
+</div>
+
+{% macro delta(a, b, good_when_up) %}
+{% set d = a - b %}
+<span class="{{ ('pos' if good_when_up else 'neg') if d > 0.004 else (('neg' if good_when_up else 'pos') if d < -0.004 else 'mute') }}">{{'%+.2f'|format(d)}} €</span>
+{% endmacro %}
+<div class="card p-0"><table class="fixedcols"><colgroup><col class="w-28p"><col class="w-24p"><col class="w-24p"><col class="w-24p"></colgroup>
+<tr><th></th><th class="num">{{A.label}}</th><th class="num">{{B.label}}</th><th class="num">Δ</th></tr>
+<tr><td>Einnahmen</td><td class="num pos"><a href="/transactions?{{A.qs}}&kind=income">{{'%.2f'|format(A.inc)}} €</a></td>
+<td class="num pos"><a href="/transactions?{{B.qs}}&kind=income">{{'%.2f'|format(B.inc)}} €</a></td><td class="num">{{ delta(A.inc, B.inc, true) }}</td></tr>
+<tr><td>Ausgaben</td><td class="num neg">{{'%.2f'|format(A.exp)}} €</td><td class="num neg">{{'%.2f'|format(B.exp)}} €</td><td class="num">{{ delta(A.exp, B.exp, false) }}</td></tr>
+<tr><td>Investiert</td><td class="num invest">{{'%.2f'|format(A.invest)}} €</td><td class="num invest">{{'%.2f'|format(B.invest)}} €</td><td class="num">{{ delta(A.invest, B.invest, true) }}</td></tr>
+<tr><td>Saldo</td><td class="num {{'pos' if A.saldo >= 0 else 'neg'}}"><a href="/transactions?{{A.qs}}">{{'%.2f'|format(A.saldo)}} €</a></td>
+<td class="num {{'pos' if B.saldo >= 0 else 'neg'}}"><a href="/transactions?{{B.qs}}">{{'%.2f'|format(B.saldo)}} €</a></td><td class="num">{{ delta(A.saldo, B.saldo, true) }}</td></tr>
+</table></div>
+
+<div class="card"><h2 class="mt-0">Ausgaben je Kategorie</h2>
+{% if rows %}
+<table><tr><th>Kategorie</th><th class="num">{{A.label}}</th><th class="num">{{B.label}}</th><th class="num">Δ</th><th class="num">%</th></tr>
+{% for r in rows %}<tr class="cmp-row" data-name="{{r.name}}" data-now="{{r.now}}" data-before="{{r.before}}">
+<td>{{r.name}}</td>
+<td class="num"><a href="/transactions?{{A.qs}}&cat={{r.qs}}">{{'%.2f'|format(r.now)}} €</a></td>
+<td class="num mute"><a href="/transactions?{{B.qs}}&cat={{r.qs}}">{{'%.2f'|format(r.before)}} €</a></td>
+<td class="num {{'neg' if r.delta > 0.004 else ('pos' if r.delta < -0.004 else 'mute')}}">{{'%+.2f'|format(r.delta)}} €</td>
+<td class="num mute">{% if r.pct is not none %}{{'%+.0f'|format(r.pct)}} %{% else %}neu{% endif %}</td>
+</tr>{% endfor %}
+<tr><td><b>Ausgaben gesamt</b></td><td class="num"><b>{{'%.2f'|format(A.exp)}} €</b></td><td class="num mute">{{'%.2f'|format(B.exp)}} €</td>
+<td class="num"><b>{{ delta(A.exp, B.exp, false) }}</b></td><td class="num mute">{% if B.exp > 0.004 %}{{'%+.0f'|format(100 * (A.exp - B.exp) / B.exp)}} %{% endif %}</td></tr>
+</table>
+{% else %}<div class="mute">Keine Ausgaben in beiden Zeiträumen.</div>{% endif %}
+</div>
+{% endblock %}

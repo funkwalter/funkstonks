@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Zahlung(en) verknüpfen</h1>
+<div class="card maxw-760">
+<div class="flex between items-baseline wrap gap-8">
+<div><b>{{sw.partner}}</b> · {{sw.booking_date}}<br><span class="mute">{{sw.description[:80]}}</span></div>
+<div class="mute">Splitwise-Gesamt {{'%.2f'|format(cost)}} € · dein Anteil <b>{{'%.2f'|format(share)}} €</b></div>
+</div>
+
+<form method="get" class="m-14-0 flex gap-8">
+<input type="text" name="q" value="{{q}}" placeholder="Optional: nach Partner/Beschreibung eingrenzen" class="flex-1 p-6">
+<button type="submit" class="ghost">Suchen</button>
+</form>
+
+<form method="post" id="link-form">
+<input type="hidden" name="q" value="{{q}}">
+<table>
+<tr><th></th><th>Datum</th><th>Quelle</th><th>Position</th><th class="num">Betrag</th></tr>
+{% for c in linked_rows %}
+<tr>
+<td><input type="checkbox" name="tx_ids" value="{{c.id}}" class="link-cb" data-amt="{{c.amount}}" checked></td>
+<td class="num">{{c.booking_date}}</td>
+<td>{{c.source}}</td>
+<td>{{c.partner}}{% if c.description %} · <span class="mute">{{c.description[:50]}}</span>{% endif %}
+<span class="pill">verknüpft</span></td>
+<td class="num {{'neg' if c.amount<0 else 'pos'}}">{{'%.2f'|format(c.amount)}} €</td>
+</tr>
+{% endfor %}
+{% if linked_rows and candidates %}
+<tr><td colspan="5" class="mute pt-10">Weitere mögliche Zahlungen:</td></tr>
+{% endif %}
+{% for c in candidates %}
+<tr>
+<td><input type="checkbox" name="tx_ids" value="{{c.id}}" class="link-cb" data-amt="{{c.amount}}"></td>
+<td class="num">{{c.booking_date}}</td>
+<td>{{c.source}}</td>
+<td>{{c.partner}}{% if c.description %} · <span class="mute">{{c.description[:50]}}</span>{% endif %}</td>
+<td class="num {{'neg' if c.amount<0 else 'pos'}}">{{'%.2f'|format(c.amount)}} €</td>
+</tr>
+{% endfor %}
+{% if not linked_rows and not candidates %}<tr><td colspan="5" class="mute">Keine Treffer – Suchbegriff anpassen.</td></tr>{% endif %}
+</table>
+<div class="mt-12 flex items-center gap-14 wrap">
+<button type="submit">Speichern</button>
+<span class="mute">Ausgewählt: <b id="sel-sum">0,00 €</b> · Splitwise-Betrag: {{'%.2f'|format(cost)}} €</span>
+</div>
+</form>
+</div>
+<script src="{{ url_for('static', filename='js/splitwise_link.js') }}"></script>
+{% endblock %}

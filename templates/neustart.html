@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Neustart</h1>
+<div class="card" id="neustart" data-url="/einstellungen#updates"><p>{{ text }}</p>
+<p class="mute">Diese Seite lädt sich von selbst neu, sobald die App wieder antwortet.</p></div>
+<script src="{{ url_for('static', filename='js/neustart.js') }}"></script>
+{% endblock %}

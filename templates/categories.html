@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Kategorien</h1>
+<div class="card">
+<form method="post" class="filters">
+<input type="text" name="add_name" placeholder="Neue Kategorie" required>
+<select name="add_kind"><option value="expense">Ausgabe</option>
+<option value="income">Einnahme</option><option value="transfer">Transfer (zählt nicht)</option></select>
+<input type="color" name="add_color" value="#5C6E8B" class="h-32 w-48 p-2">
+<button>Anlegen</button>
+</form>
+<form method="post" class="inline mt-8" data-confirm="Alle Kategoriefarben systematisch neu verteilen?&#10;&#10;Jede Hauptkategorie bekommt einen eigenen Farbton, ihre Unterkategorien einen ähnlichen. Von Hand gesetzte Farben werden dabei überschrieben.">
+<button class="ghost" name="recolor" value="1"
+  title="Jede Hauptkategorie bekommt einen eigenen Farbton, Unterkategorien eine Variante davon">Farben neu verteilen</button>
+</form>
+</div>
+<div class="card p-0"><table>
+<tr><th>Name</th><th>Typ</th><th>Farbe</th><th class="num">Verwendet</th><th></th><th></th></tr>
+{% for c in top %}
+<tr>
+<form method="post">
+<td><input type="text" name="name_{{c.id}}" value="{{c.name}}" class="w-200"></td>
+<td><select name="kind_{{c.id}}">
+<option value="expense" {{'selected' if c.kind=='expense'}}>Ausgabe</option>
+<option value="income" {{'selected' if c.kind=='income'}}>Einnahme</option>
+<option value="transfer" {{'selected' if c.kind=='transfer'}}>Transfer</option></select></td>
+<td><input type="color" name="color_{{c.id}}" value="{{c.color}}" class="h-30 w-44 p-2"></td>
+<td class="num">{{c.used}}</td>
+<td class="nowrap"><button name="save" value="{{c.id}}">Speichern</button>
+<button type="button" class="ghost cat-add-btn" data-target="add-{{c.id}}" title="Unterkategorie anlegen">+</button></td>
+<td>{% if c.id not in children and c.name not in system_cats %}<button class="ghost" name="delete" value="{{c.id}}" data-confirm="{{ ('Kategorie „' ~ c.name ~ '“ löschen?' ~ (' ' ~ c.n_rules ~ ' Regel' ~ ('n' if c.n_rules != 1 else '') ~ ' werden mitgelöscht.' if c.n_rules else '') ~ (' ' ~ c.used ~ ' Zahlung' ~ ('en' if c.used != 1 else '') ~ ' werden wieder unkategorisiert und warten unter Durchgehen.' if c.used else '')) }}">löschen</button>{% endif %}</td>
+</form>
+</tr>
+{% for sub in children.get(c.id, []) %}
+<tr class="bg-panel">
+<form method="post">
+<td class="pl-28">↳ <input type="text" name="name_{{sub.id}}" value="{{sub.name}}" class="w-172"></td>
+<td class="mute">{{'Ausgabe' if sub.kind=='expense' else 'Einnahme' if sub.kind=='income' else 'Transfer'}}</td>
+<td><input type="color" name="color_{{sub.id}}" value="{{sub.color}}" class="h-30 w-44 p-2"></td>
+<td class="num">{{sub.used}}</td>
+<td><button name="save" value="{{sub.id}}">Speichern</button></td>
+<td><button class="ghost" name="delete" value="{{sub.id}}" data-confirm="{{ ('Unterkategorie „' ~ sub.name ~ '“ löschen?' ~ (' ' ~ sub.n_rules ~ ' Regel' ~ ('n' if sub.n_rules != 1 else '') ~ ' werden mitgelöscht.' if sub.n_rules else '') ~ (' ' ~ sub.used ~ ' Zahlung' ~ ('en' if sub.used != 1 else '') ~ ' werden wieder unkategorisiert und warten unter Durchgehen.' if sub.used else '')) }}">löschen</button></td>
+</form>
+</tr>
+{% endfor %}
+<tr class="cat-add-row" id="add-{{c.id}}" hidden>
+<form method="post">
+<td class="pl-28">↳ <input type="hidden" name="add_parent_id" value="{{c.id}}">
+<input type="text" name="add_name" placeholder="Neue Unterkategorie von {{c.name}}" required class="w-172"></td>
+<td class="mute" colspan="2">
+<input type="color" name="add_color" value="{{c.color}}" class="h-30 w-44 p-2"></td>
+<td></td>
+<td><button>Anlegen</button></td>
+<td><button type="button" class="ghost cat-add-cancel">abbrechen</button></td>
+</form>
+</tr>
+{% endfor %}
+</table></div>
+<script src="{{ url_for('static', filename='js/categories.js') }}"></script>
+<div class="mute">„Wohnung" steuert die Wohnen/Privat-Trennung der laufenden Kosten –
+umbenennen ist ok, aber dann bitte auch dort neu kategorisieren.
+Transfer-Kategorien (Umbuchung, Verrechnungen, …) zählen nie als Ausgabe oder Einnahme.
+Unterkategorien erben automatisch den Typ ihrer Oberkategorie (nicht separat änderbar)
+und sind beim Kategorisieren verpflichtend zu wählen, sobald mindestens eine existiert –
+die Oberkategorie selbst verschwindet dann aus der Auswahl für neue Kategorisierungen
+(bleibt aber weiter gültig für bereits so verbuchte, ältere Zahlungen).</div>
+{% endblock %}

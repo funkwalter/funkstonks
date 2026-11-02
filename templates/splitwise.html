@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% import "_cat_options.html" as catopt %}
+{% block content %}
+<h1>Splitwise <a class="help-link" href="/hilfe#seiten" title="Hilfe zu dieser Seite" aria-label="Hilfe zu dieser Seite">?</a></h1>
+
+{% if not groups %}<div class="card">Noch keine Splitwise-Exporte importiert.</div>{% endif %}
+{% for name, g in groups.items() %}
+<div class="card" id="g-{{name|urlencode}}">
+<details open>
+<summary class="pointer nolist flex items-center gap-10 wrap">
+<h2 class="m-0 d-inline">{{name}}</h2>
+<span class="pill">{{g.n}} Einträge · zuletzt {{g.last}}</span>
+<span class="ml-auto flex gap-12 items-center wrap">
+{% if name not in urlaub_excluded_groups %}
+<label class="mute fw-normal" title="Jede beförderte Ausgabe dieser Gruppe automatisch als Urlaub kategorisieren">
+<input type="checkbox" class="urlaub-toggle" data-group="{{name}}" {{'checked' if name in urlaub_partners}}>
+Als Urlaub markieren</label>
+{% endif %}
+{% if g.saldo|abs < 0.005 %}
+<form method="post" action="/splitwise/{{name|urlencode}}/close" class="inline"
+ data-confirm="Gruppe {{name}} schließen? Die Buchungen bleiben erhalten, die Gruppe wandert unten unter „Geschlossen“. Ein neuer Export mit Bewegungen öffnet sie wieder.">
+<button class="ghost fs-12" title="Saldo ist 0 – Gruppe abschließen">Gruppe schließen</button></form>
+{% endif %}
+</span>
+</summary>
+<div class="kpis m-8-0">
+<div class="kpi"><span>Dein Saldo</span>
+<b class="{{'pos' if g.saldo>=0 else 'neg'}}">{{'%.2f'|format(g.saldo)}} €</b></div>
+</div>
+
+{% set mm = mismatches.get(name, []) %}
+{% if mm %}
+{% set offen = mm | rejectattr('confirmed') | list %}
+<div class="card border-err bg-err p-10 m-8-0">
+<b class="err-text">Beträge prüfen</b>
+<table>
+<tr><th>Datum</th><th>Position</th><th class="num">in Splitwise</th>
+<th class="num">am Konto</th><th class="num">Differenz</th><th></th></tr>
+{% for x in mm %}<tr class="mm-row{{' dim-50' if x.confirmed}}" data-tx-id="{{x.id}}">
+<td class="num">{{x.date}}</td>
+<td>{{x.description[:28]}} <span class="mute">({{x.sw_category}})</span></td>
+<td class="num">{{'%.2f'|format(x.cost)}} €</td>
+<td class="num">{% if x.bank_amount %}{{'%.2f'|format(x.bank_amount)}} €
+<span class="mute">{{x.bank_date}}</span>{% else %}<span class="mute">nichts gefunden</span>{% endif %}</td>
+<td class="num"><b class="err-text">{% if x.diff is not none %}{{'%+.2f'|format(x.diff)}} €{% else %}–{% endif %}</b></td>
+<td class="nowrap">
+<button type="button" class="ghost mm-ok{{' hide' if x.confirmed}}">passt so</button>
+<span class="mute mm-done{{' hide' if not x.confirmed}}">bestätigt
+<button type="button" class="ghost mm-undo">rückgängig</button></span>
+</td>
+</tr>{% endfor %}
+</table>
+</div>
+{% endif %}
+
+{% set items = promoted_by_group.get(name, []) %}
+{% if items %}
+<table class="fixedcols"><colgroup><col class="w-11p"><col class="w-32p"><col class="w-11p">
+<col class="w-26p"><col class="w-20p"></colgroup>
+<tr><th>Datum</th><th>Position</th><th class="num">Betrag</th><th>Notiz</th><th>Kategorie</th></tr>
+{% for t in items %}<tr>
+<td class="num">{{t.booking_date}}</td>
+<td>{{t.description[:50]}}</td>
+<td class="num {{'neg' if t.amount<0 else 'pos'}}">{{'%.2f'|format(t.amount)}} €</td>
+<td class="mute">{{t.note}}</td>
+<td>{% if t.settlement %}<span class="mute" title="Eine Ausgleichszahlung verrechnet nur Salden – die einzelnen Ausgaben dahinter zählen bereits. Deshalb keine Kategorie.">gleicht Salden aus – zählt nicht</span>
+{% elif not t.matched %}<form method="post" action="/tx/{{t.id}}/update" class="inline sw-cat-form">
+<select name="category_id" data-tx-id="{{t.id}}">
+<option value="">—</option>
+{{ catopt.options(cat_groups, t.category_id, cat_by_id) }}
+</select></form>
+{% elif t.own_advance and t.linked %}
+<form method="post" action="/splitwise/unlink/{{t.id}}" class="inline" data-confirm="Verknüpfung aufheben?">
+<button type="submit" class="ghost fs-12">Aufheben</button></form>
+{% elif t.own_advance and not t.linked and not t.dismissed %}
+<a href="/splitwise/link/{{t.id}}" class="btn ghost fs-12">verknüpfen…</a>
+<form method="post" action="/splitwise/dismiss/{{t.id}}" class="inline">
+<button type="submit" class="ghost fs-12">ignorieren</button></form>
+{% elif t.own_advance and not t.linked and t.dismissed %}
+<form method="post" action="/splitwise/undismiss/{{t.id}}" class="inline">
+<button type="submit" class="ghost fs-12">wieder aufnehmen</button></form>
+{% endif %}</td>
+</tr>{% endfor %}</table>
+{% else %}<div class="mute">Noch keine Zahlungen ab Trackingbeginn in dieser Gruppe.</div>{% endif %}
+</details>
+</div>
+{% endfor %}
+{% if closed_groups %}
+<div class="card">
+<details>
+<summary class="pointer nolist"><h2 class="m-0 d-inline">Geschlossen</h2>
+<span class="pill">{{closed_groups|length}} Gruppe{{'n' if closed_groups|length != 1 else ''}}</span>
+<span class="mute"> – beglichen und abgeschlossen; die Buchungen zählen weiter, ein Export mit
+neuen Bewegungen öffnet die Gruppe wieder</span></summary>
+<table class="mt-8"><tr><th>Gruppe</th><th class="num">Saldo</th><th class="num">Einträge</th>
+<th>letzte Position</th><th>geschlossen am</th><th></th></tr>
+{% for name, g in closed_groups.items() %}<tr class="closed-group" data-group="{{name}}">
+<td><b>{{name}}</b></td>
+<td class="num">{{'%.2f'|format(g.saldo)}} €</td>
+<td class="num">{{g.n}}</td><td>{{g.last}}</td><td>{{closed[name]}}</td>
+<td><form method="post" action="/splitwise/{{name|urlencode}}/close" class="inline">
+<input type="hidden" name="undo" value="1">
+<button class="ghost fs-12">wieder öffnen</button></form></td>
+</tr>{% endfor %}</table>
+</details>
+</div>
+{% endif %}
+<script src="{{ url_for('static', filename='js/splitwise.js') }}"></script>
+{% endblock %}
